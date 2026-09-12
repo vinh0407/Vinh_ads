@@ -274,7 +274,7 @@ export default function AlbumPage() {
         <div className="rounded-2xl border border-white/[0.06] bg-[#111117] p-12 text-center">
           <ImageIcon className="h-10 w-10 text-zinc-600 mx-auto mb-3" />
           <p className="text-sm font-semibold text-zinc-300">Chưa có media nào trong danh sách</p>
-          <p className="text-xs text-zinc-500 mt-1">Hãy bấm nút "Tải Ảnh / Video Từ Máy" ở trên để lưu vào kho!</p>
+          <p className="text-xs text-zinc-500 mt-1">Hãy bấm nút &quot;Tải Ảnh / Video Từ Máy&quot; ở trên để lưu vào kho!</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
