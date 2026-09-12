@@ -1,401 +1,626 @@
-# VinhAds - Video SaaS Automation Platform
+# VinhAds
 
-> **Hệ thống tự động hóa tạo video AI, quản lý sản phẩm Shopee Affiliate và xuất bản đa kênh Facebook, TikTok, Shorts & Threads.**
+**AI-Powered Content Automation & Affiliate Marketing Platform**
 
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
-[![NestJS](https://img.shields.io/badge/NestJS-10-red.svg)](https://nestjs.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-7-red.svg)](https://redis.io/)
-[![Prisma](https://img.shields.io/badge/Prisma-5-2D3748.svg)](https://prisma.io/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js\&logoColor=white)](https://nodejs.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-10-E0234E?logo=nestjs\&logoColor=white)](https://nestjs.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=next.js\&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react\&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript\&logoColor=white)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql\&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis\&logoColor=white)](https://redis.io/)
+[![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?logo=prisma\&logoColor=white)](https://www.prisma.io/)
+[![BullMQ](https://img.shields.io/badge/BullMQ-Queue-CB3837)](https://bullmq.io/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker\&logoColor=white)](https://www.docker.com/)
+[![Playwright](https://img.shields.io/badge/Playwright-Automation-2EAD33?logo=playwright\&logoColor=white)](https://playwright.dev/)
+[![Turborepo](https://img.shields.io/badge/Turborepo-Monorepo-EF4444?logo=turborepo\&logoColor=white)](https://turbo.build/)
 
----
+VinhAds is an AI-powered platform for automating **content creation, video processing, affiliate marketing, multi-channel publishing, and performance analytics**.
 
-## 📖 Tổng quan
-
-**VinhAds** là nền tảng SaaS tự động hóa quy trình content marketing video hoàn chỉnh:
-
-1. **🔄 Ingestion** - Tự động sync video từ Facebook Pages, YouTube, TikTok
-2. **🤖 AI Content Factory** - Gemini AI tạo script TikTok, video quảng cáo, bài viết social, match sản phẩm Shopee
-3. **💰 Affiliate Monetization** - Quản lý sản phẩm Shopee, chèn link affiliate vào first comment, track clicks/conversions
-4. **📤 Multi-channel Publishing** - Đăng video lên Facebook Reels (chunked upload), lên lịch tự động qua BullMQ
-5. **📊 Analytics Loop** - Theo dõi metrics, revenue attribution, product performance
+The platform combines AI services, background workers, media processing, scheduling, affiliate management, and publishing workflows into a unified system.
 
 ---
 
-## 🏗️ Kiến trúc hệ thống
+## Table of Contents
 
+* [Overview](#overview)
+* [Features](#features)
+* [Technology Stack](#technology-stack)
+* [Architecture](#architecture)
+* [AI System](#ai-system)
+* [Background Processing](#background-processing)
+* [Database](#database)
+* [Project Structure](#project-structure)
+* [Getting Started](#getting-started)
+* [Environment Configuration](#environment-configuration)
+* [Docker](#docker)
+* [Testing](#testing)
+* [Security](#security)
+* [Troubleshooting](#troubleshooting)
+* [Contributing](#contributing)
+* [License](#license)
+
+---
+
+## Overview
+
+VinhAds provides an end-to-end content automation workflow:
+
+```text
+Content Sources
+      |
+      v
+Video Synchronization
+      |
+      v
+Media Processing
+      |
+      v
+AI Content Generation
+      |
+      v
+Content Review
+      |
+      v
+Affiliate Products
+      |
+      v
+Scheduling
+      |
+      v
+Publishing
+      |
+      v
+Analytics
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        MONOREPO STRUCTURE                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  apps/                                                           │
-│  ├── web/              # Next.js 14 Dashboard (port 3001)       │
-│  └── desktop-agent/    # Electron app (planned)                 │
-│                                                                  │
-│  backend/              # NestJS API Server (port 3000)          │
-│  ├── src/                                                          
-│  │   ├── auth/         # JWT + Google OAuth + PKCE               │
-│  │   ├── sources/      # Video source management                 │
-│  │   ├── videos/       # Video CRUD + processing pipeline        │
-│  │   ├── posts/        # Post creation + templates               │
-│  │   ├── schedules/    # Cron scheduling + dispatch              │
-│  │   ├── products/     # Shopee affiliate products               │
-│  │   ├── templates/    # Caption/Comment templates               │
-│  │   ├── facebook/     # OAuth + Graph API publishing            │
-│  │   ├── queue/        # BullMQ + Redis job queues               │
-│  │   ├── workers/      # Background workers (5 workers)          │
-│  │   ├── ai/           # Gemini Service (6 AI capabilities)      │
-│  │   ├── storage/      # S3-compatible storage                   │
-│  │   ├── analytics/    # Metrics + revenue tracking              │
-│  │   └── ...                                                    │
-│  └── prisma/           # Database schema (23 models)            │
-│                                                                  │
-│  vince-ai/             # Shared packages monorepo (TurboRepo)    │
-│  ├── packages/shared/  # Types, utils, logger, events, crypto    │
-│  ├── packages/ai/                                                         
-│  │   ├── gemini/       # Google GenAI provider                  │
-│  │   ├── nemotron/     # NVIDIA Nemotron provider               │
-│  │   ├── router/       # AI Task Router (keyword-based)         │
-│  │   ├── orchestrator/ # Multi-step AI orchestration            │
-│  │   └── opencode/     # OpenCode provider                      │
-│  ├── packages/auth/google/  # Google OAuth + PKCE               │
-│  └── packages/browser/playwright/  # Browser automation         │
-│                                                                  │
-│  StartAll/             # 1-click startup scripts                │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+
+---
+
+## Features
+
+### AI Content Generation
+
+* News and article summarization
+* Short-form video scripts
+* Product advertising scripts
+* Social media content
+* Customer response suggestions
+* Affiliate product matching
+* Content repurposing
+
+### Video Management
+
+* Video source synchronization
+* Video library management
+* Metadata management
+* Thumbnail generation
+* Media validation and processing
+* Video status tracking
+
+### Affiliate Marketing
+
+* Product catalog
+* Affiliate links
+* Product-content relationships
+* Product matching
+* Click tracking
+* Conversion tracking
+* Performance analysis
+
+### Publishing
+
+* Content creation and editing
+* Publishing schedules
+* Background publishing jobs
+* Platform integrations
+* Publishing status tracking
+* Platform-specific workflows
+
+### Analytics
+
+* Publishing metrics
+* Engagement metrics
+* Affiliate clicks
+* Conversion metrics
+* Product performance
+* Revenue attribution where supported
+
+---
+
+## Technology Stack
+
+| Layer          | Technology                                 |
+| -------------- | ------------------------------------------ |
+| Runtime        | Node.js 20+                                |
+| Backend        | NestJS 10                                  |
+| Frontend       | Next.js 14 / React                         |
+| Language       | TypeScript                                 |
+| Database       | PostgreSQL 15                              |
+| ORM            | Prisma 5                                   |
+| Queue          | BullMQ                                     |
+| Cache          | Redis 7                                    |
+| Authentication | JWT / Google OAuth / PKCE                  |
+| AI             | Google Gemini / NVIDIA Nemotron / OpenCode |
+| Automation     | Playwright                                 |
+| Storage        | S3-compatible storage                      |
+| Monorepo       | Turborepo                                  |
+| Deployment     | Docker / Docker Compose                    |
+
+---
+
+## Architecture
+
+```text
+VinhAds
+|
++-- Web Dashboard
+|   +-- Next.js
+|   +-- Content Management
+|   +-- Video Library
+|   +-- Products
+|   +-- Publishing
+|   +-- Analytics
+|
++-- Backend API
+|   +-- NestJS
+|   +-- Authentication
+|   +-- Videos
+|   +-- Posts
+|   +-- Products
+|   +-- Schedules
+|   +-- AI
+|   +-- Analytics
+|
++-- Background Workers
+|   +-- Sync Worker
+|   +-- Video Worker
+|   +-- Publish Worker
+|   +-- Scheduler Worker
+|   +-- Analytics Worker
+|   +-- Notification Worker
+|
++-- Shared Packages
+|   +-- Shared Types
+|   +-- AI Router
+|   +-- AI Orchestrator
+|   +-- Authentication
+|   +-- Browser Automation
+|
++-- Infrastructure
+    +-- PostgreSQL
+    +-- Redis
+    +-- Object Storage
+    +-- Docker
 ```
 
 ---
 
-## 🚀 Khởi động nhanh (1-Click)
+## AI System
 
-### Cách 1: Script Master (Khuyến nghị)
+VinhAds provides a unified AI layer for different content operations.
+
+### AI Providers
+
+* Google Gemini
+* NVIDIA Nemotron
+* OpenCode
+
+### AI Components
+
+```text
+AI Request
+    |
+    v
+AI Task Router
+    |
+    v
+Provider Selection
+    |
+    v
+AI Model
+    |
+    v
+AI Orchestrator
+    |
+    v
+Structured Result
+```
+
+### Supported Tasks
+
+| Task                | Output                               |
+| ------------------- | ------------------------------------ |
+| News Analysis       | Summary, facts, categories           |
+| Video Scripts       | Script, hashtags, visual suggestions |
+| Product Advertising | Script, voiceover, scenes            |
+| Social Content      | Caption, hashtags, CTA               |
+| Customer Support    | Intent and response                  |
+| Product Matching    | Relevant products                    |
+| Content Repurposing | Platform-specific content            |
+
+AI-generated content should be reviewed before publication.
+
+---
+
+## Background Processing
+
+VinhAds uses **Redis and BullMQ** for asynchronous processing.
+
+```text
+Application
+     |
+     v
+BullMQ
+     |
+     v
+Redis
+     |
+     v
+Worker
+     |
+     v
+Processing
+     |
+     v
+PostgreSQL
+```
+
+Workers handle:
+
+* Video synchronization
+* Media processing
+* Publishing
+* Scheduling
+* Analytics
+* Notifications
+
+---
+
+## Database
+
+VinhAds uses PostgreSQL with Prisma.
+
+```text
+User
+ |
+ +-- Video Sources
+ |    |
+ |    +-- Videos
+ |         |
+ |         +-- Media Files
+ |         |
+ |         +-- Posts
+ |              |
+ |              +-- Schedules
+ |              +-- Products
+ |
+ +-- Platform Connections
+
+Products
+ |
+ +-- Affiliate Links
+```
+
+Core entities include:
+
+* Users
+* Authentication
+* Video sources
+* Videos
+* Media files
+* Posts
+* Schedules
+* Products
+* Affiliate links
+* Platform connections
+* Jobs
+* Analytics
+* Notifications
+
+Database changes are managed through Prisma migrations.
+
+---
+
+## Project Structure
+
+```text
+project-root/
+|
++-- apps/
+|   +-- web/
+|
++-- backend/
+|   +-- src/
+|   |   +-- auth/
+|   |   +-- sources/
+|   |   +-- videos/
+|   |   +-- posts/
+|   |   +-- schedules/
+|   |   +-- products/
+|   |   +-- ai/
+|   |   +-- queue/
+|   |   +-- workers/
+|   |   +-- analytics/
+|   |   +-- storage/
+|   |
+|   +-- prisma/
+|
++-- packages/
+|   +-- shared/
+|   +-- ai/
+|   +-- auth/
+|   +-- browser/
+|
++-- StartAll/
++-- docker-compose.yml
++-- package.json
++-- README.md
+```
+
+---
+
+## Getting Started
+
+### Requirements
+
+* Node.js 20+
+* npm
+* Git
+* Docker
+* Docker Compose
+* PostgreSQL
+* Redis
+
+### Clone
 
 ```bash
-# Double-click file shortcut trên Desktop:
-# Desktop → "StartAll - VinhAds.lnk"
-
-# Hoặc chạy trực tiếp:
-cd StartAll
-StartAll.bat
+git clone <YOUR_REPOSITORY_URL>
+cd <YOUR_PROJECT_DIRECTORY>
 ```
 
-**Tiến trình tự động:**
-1. 🐳 Khởi động Docker (PostgreSQL 5432 + Redis 6379)
-2. 🚀 Backend NestJS API Server (port 3000)
-3. ⚙️ Worker Queue (BullMQ - 5 workers)
-4. 🌐 Frontend Next.js Dashboard (port 3001)
-5. 🔗 Cloudflare Tunnels (public HTTPS)
-6. 🌍 Mở browser tại `http://localhost:3001/dashboard`
-
-### Cách 2: Manual (Development)
+### Install
 
 ```bash
-# 1. Start Database
+npm install
+```
+
+### Start Infrastructure
+
+```bash
 docker-compose up -d postgres redis
+```
 
-# 2. Backend
+### Database Migration
+
+```bash
 cd backend
-npm install
 npx prisma migrate dev
+```
+
+### Start Backend
+
+```bash
 npm run start:dev
+```
 
-# 3. Worker (terminal riêng)
-cd backend
+### Start Worker
+
+```bash
 npm run start:worker
+```
 
-# 4. Frontend (terminal riêng)
-cd apps/web  # hoặc vince-ai/apps/web ở root
-npm install
+### Start Frontend
+
+```bash
+cd apps/web
 npm run dev
 ```
 
 ---
 
-## 🔗 Truy cập hệ thống
+## Environment Configuration
 
-| Dịch vụ | Local URL | Mô tả |
-|---------|-----------|-------|
-| **Web Dashboard** | `http://localhost:3001/dashboard` | Giao diện quản trị chính |
-| **Backend API** | `http://localhost:3000/api` | REST API + Swagger |
-| **Quản lý bài đăng** | `http://localhost:3001/dashboard/posts` | Tạo/sửa/lên lịch bài |
-| **Video Library** | `http://localhost:3001/dashboard/videos` | Import, xử lý, archive |
-| **Nguồn Video** | `http://localhost:3001/dashboard/sources` | Kết nối Facebook Pages |
-| **Sản phẩm Affiliate** | `http://localhost:3001/dashboard/products` | Shopee products + links |
-| **Lịch đăng bài** | `http://localhost:3001/dashboard/schedules` | Calendar view |
-| **Analytics** | `http://localhost:3001/dashboard/analytics` | Metrics, revenue, CTR |
+### Backend
 
----
-
-## ⚙️ Cấu hình môi trường
-
-### Backend (`backend/.env`)
+Create `backend/.env`:
 
 ```env
-# App
 PORT=3000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:3001
 
-# Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/accontent_hub
+DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/DATABASE
 
-# Redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
-REDIS_PASSWORD=
 
-# JWT (THAY ĐỔI TRONG PRODUCTION!)
-JWT_SECRET=your-super-secret-jwt-key-min-32-chars
-JWT_REFRESH_SECRET=your-refresh-secret-min-32-chars
+JWT_SECRET=YOUR_JWT_SECRET
+JWT_REFRESH_SECRET=YOUR_REFRESH_SECRET
+ENCRYPTION_KEY=YOUR_ENCRYPTION_KEY
 
-# Encryption (32 chars exactly)
-ENCRYPTION_KEY=32-char-encryption-key-for-tokens!!
+GEMINI_API_KEY=YOUR_GEMINI_KEY
+NEMOTRON_API_KEY=YOUR_NEMOTRON_KEY
+OPENCODE_API_KEY=YOUR_OPENCODE_KEY
 
-# Facebook OAuth
-FACEBOOK_APP_ID=your-app-id
-FACEBOOK_APP_SECRET=your-app-secret
-FACEBOOK_CALLBACK_URL=http://localhost:3000/api/facebook/callback
-
-# Storage (S3-compatible: MinIO, AWS S3, Cloudflare R2)
-STORAGE_ENDPOINT=http://localhost:9000
-STORAGE_BUCKET=vinhads
-STORAGE_ACCESS_KEY=minioadmin
-STORAGE_SECRET_KEY=minioadmin
-STORAGE_REGION=auto
-
-# AI Providers
-GEMINI_API_KEY=your-gemini-api-key
-NEMOTRON_API_KEY=your-nemotron-api-key
-OPENCODE_API_KEY=your-opencode-api-key
+STORAGE_ENDPOINT=YOUR_STORAGE_ENDPOINT
+STORAGE_BUCKET=YOUR_BUCKET
+STORAGE_ACCESS_KEY=YOUR_ACCESS_KEY
+STORAGE_SECRET_KEY=YOUR_SECRET_KEY
 ```
 
-### Frontend (`apps/web/.env.local` hoặc `vince-ai/apps/web/.env.local`)
+### Frontend
+
+Create `.env.local`:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3000/api
 ```
 
----
-
-## 🤖 AI Capabilities (Gemini Service)
-
-Backend tích hợp **Gemini 1.5 Pro/Flash** với 6 khả năng chính:
-
-| Capability | Mô tả | Input | Output |
-|------------|-------|-------|--------|
-| **News Summary** | Tóm tắt, phân loại, impact analysis bài báo | Title, content, URL | Structured JSON (category, sentiment, keyFacts) |
-| **TikTok Script** | Kịch bản 45-60s vertical video (hook/context/analysis/opinion/CTA) | News article | Full script + hashtags + visual suggestions |
-| **Customer Reply** | Phân loại intent + trả lời tự động cho chat Facebook/Zalo | Message, channel, product catalog | Intent + suggested reply + confidence |
-| **Social Draft** | Bài viết Threads/Facebook viral + affiliate mềm | Topic, platform, affiliate product | Headline, body, hashtags, CTA |
-| **Product Ad Video** | 15-20s ad script theo Google Flow spec (voiceover, subtitles, timeline) | Product info + image | Complete ad spec JSON |
-| **Shopee Match** | Đối chiếu video content → sản phẩm Shopee cao chuyển đổi | Video title/content, catalog | Matched product + search queries + repurpose angle |
+Never commit real credentials or secrets to source control.
 
 ---
 
-## 👷 Background Workers (BullMQ + Redis)
+## Local Development
 
-| Worker | Concurrency | Trigger | Chức năng |
-|--------|-------------|---------|-----------|
-| **SyncWorker** | 2 | Cron (mỗi phút) | Sync video từ Facebook Pages → download → store S3 |
-| **PublishWorker** | 1 | Queue `publish-post` | Upload video lên Facebook Reels (chunked 4MB) |
-| **SchedulerWorker** | 5 | Cron (mỗi phút) | Dispatch bài đăng scheduled → publish queue |
-| **VideoProcessorWorker** | - | Queue `video-processing` | Download, thumbnail, transcode, validate, hash |
-| **AnalyticsWorker** | - | Queue `analytics` | Fetch post/page metrics, affiliate clicks |
-| **NotificationWorker** | - | Queue `notifications` | Real-time notifications |
-
----
-
-## 🗄️ Database Schema (Prisma)
-
-**23 Models** với quan hệ chặt chẽ:
-
-```
-User (1) ─────< SourcePage (N) ─────< SourceVideo (N) ─────< Video (N) ─────< Post (N) ─────< Schedule (1)
-     │                               │                      │                  │
-     │                               │                      │                  └─< PostProduct (N) >── Product (N)
-     │                               │                      │                                         └─< AffiliateLink (N)
-     └─< FacebookPage (N) ──────────┘                      └─< VideoFile (N)
-           └─< FacebookPageToken (1) (encrypted)
-```
-
-**Key Enums:** `VideoStatus`, `PostStatus`, `JobStatus`, `Platform`, `AffiliateNetwork`, `VideoProcessingJobType`, `NotificationType`, `ActivityAction`
+| Service   | Address                                     |
+| --------- | ------------------------------------------- |
+| Web       | `http://localhost:3001`                     |
+| API       | `http://localhost:3000/api`                 |
+| Dashboard | `http://localhost:3001/dashboard`           |
+| Videos    | `http://localhost:3001/dashboard/videos`    |
+| Products  | `http://localhost:3001/dashboard/products`  |
+| Schedules | `http://localhost:3001/dashboard/schedules` |
+| Analytics | `http://localhost:3001/dashboard/analytics` |
 
 ---
 
-## 📦 Scripts hữu ích
+## Docker
+
+Build:
 
 ```bash
-# Root level
-npm run dev                 # Chạy tất cả (backend + worker + frontend)
-npm run build               # Build production
-npm run docker:up           # Docker compose up
-npm run docker:down         # Docker compose down
-npm run db:up               # Chỉ start DB + Redis
-npm run db:down             # Stop DB + Redis
-
-# Backend
-cd backend
-npm run start:dev           # Dev với hot reload
-npm run start:worker        # Chạy worker queue
-npm run prisma:studio       # Prisma Studio UI
-npm run prisma:migrate      # Migration
-npm run test                # Jest tests
-npm run lint                # ESLint
-
-# Frontend (apps/web hoặc vince-ai/apps/web)
-npm run dev                 # Next.js dev (port 3001)
-npm run build               # Production build
-npm run lint                # Next.js lint
-npm run typecheck           # TypeScript check
-```
-
----
-
-## 🔐 Facebook Page đã cấu hình
-
-- **Fanpage:** **Loài mèo gắn link** (Page ID: `1282948524895927`)
-- **Token permissions:** `pages_manage_posts`, `pages_read_engagement`, `pages_show_list`
-- **Meta Threads App ID:** `1400119534865638`
-
----
-
-## 🐳 Docker Production
-
-```bash
-# Build images
 docker-compose build
+```
 
-# Start production
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+Start:
 
-# Logs
+```bash
+docker-compose up -d
+```
+
+Logs:
+
+```bash
 docker-compose logs -f backend
 docker-compose logs -f worker
 docker-compose logs -f frontend
 ```
 
-**Docker services:**
-- `postgres:15` - Database
-- `redis:7-alpine` - Queue + Cache
-- `backend` - NestJS API (multi-stage build)
-- `worker` - Background workers (shared image)
-- `frontend` - Next.js standalone output
+Stop:
+
+```bash
+docker-compose down
+```
 
 ---
 
-## 🔧 Troubleshooting
+## Testing
 
-### Port đã bị chiếm
+Run the available validation commands:
+
 ```bash
-# Kill process on port 3000/3001/5432/6379
+npm run lint
+npm run test
+npm run build
+npm run typecheck
+```
+
+Before merging changes, ensure the relevant tests and builds pass.
+
+---
+
+## Security
+
+VinhAds handles authentication credentials, social platform connections, AI APIs, affiliate data, and customer-related content.
+
+Security requirements:
+
+* Never commit secrets
+* Use environment variables
+* Encrypt sensitive tokens
+* Validate external input
+* Protect API endpoints
+* Apply authorization checks
+* Avoid logging credentials
+* Rotate compromised credentials
+* Keep production secrets outside source control
+
+External integrations must comply with the respective platform APIs and policies.
+
+---
+
+## Troubleshooting
+
+### Port Already in Use
+
+```bat
 netstat -ano | findstr :3000
-taskkill /PID <PID> /F
+netstat -ano | findstr :3001
 ```
 
-### Prisma migration failed
+### Database
+
 ```bash
-cd backend
-npx prisma migrate reset --force
-npx prisma migrate dev
+docker ps
+npx prisma migrate status
 ```
 
-### Node modules issues
-```bash
-# Clean install
-rm -rf node_modules package-lock.json
-npm install
-```
+### Redis
 
-### Redis connection refused
 ```bash
-# Check Redis running
-docker ps | grep redis
-# Restart
+docker-compose logs redis
 docker-compose restart redis
 ```
 
+### Worker
+
+Verify:
+
+* Redis is running
+* Worker is running
+* Queue configuration is correct
+* Jobs are being created
+* External services are available
+
 ---
 
-## 📁 Cấu trúc thư mục quan trọng
+## Contributing
 
-```
-C:\VisualStudio\Modern SaaS Dashboard Design\
-├── backend/                    # NestJS API (MAIN)
-│   ├── src/
-│   │   ├── ai/gemini.service.ts    # 6 AI capabilities (666 lines)
-│   │   ├── workers/*.worker.ts     # 5 BullMQ workers
-│   │   ├── queue/                  # Job contracts + QueueService
-│   │   └── prisma/schema.prisma    # 23 models
-│   ├── prisma/migrations/          # DB migrations
-│   └── Dockerfile / Dockerfile.worker
-│
-├── vince-ai/                     # TurboRepo monorepo (SHARED PACKAGES - internal @vince-ai/* scopes)
-│   ├── apps/web/                 # Next.js Dashboard (duplicate)
-│   ├── packages/
-│   │   ├── shared/               # Types, crypto, logger, events
-│   │   ├── ai/                   # Router, Orchestrator, Providers
-│   │   ├── auth/google/          # OAuth + PKCE
-│   │   └── browser/playwright/   # Browser automation
-│   └── turbo.json
-│
-├── apps/web/                     # Next.js Dashboard (ROOT LEVEL)
-│   └── src/app/(dashboard)/      # Route groups
-│
-├── StartAll/                     # 1-Click startup
-│   ├── StartAll.bat / .ps1 / .vbs
-│   └── StopAll.bat
-│
-├── docker-compose.yml
-├── package.json                  # Root scripts
-└── README.md
+```bash
+git checkout -b feature/your-feature
+git add .
+git commit -m "feat: describe your change"
+git push origin feature/your-feature
 ```
 
----
+Pull requests should include:
 
-## 🤝 Contributing
-
-1. Fork repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push branch: `git push origin feature/amazing-feature`
-5. Open Pull Request
-
-**Code Style:**
-- ESLint + Prettier (run `npm run lint` và `npm run format`)
-- TypeScript strict mode
-- Conventional commits
+* Description of changes
+* Reason for changes
+* Testing information
+* Screenshots for UI changes
+* Required configuration changes
 
 ---
 
-## 📄 License
+## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This project is licensed under the **MIT License**.
 
----
-
-## 🙏 Acknowledgments
-
-- **NestJS** - Progressive Node.js framework
-- **Next.js** - React framework for production
-- **Prisma** - Next-gen ORM
-- **BullMQ** - Redis-based queue
-- **Google Gemini** - Generative AI
-- **Radix UI** - Accessible component primitives
-- **TailwindCSS** - Utility-first CSS
-- **Cloudflare Tunnel** - Secure public access
+See [`LICENSE`](LICENSE) for details.
 
 ---
 
-## 📞 Support
+## Acknowledgments
 
-- **Issues:** [GitHub Issues](https://github.com/vinh0407/ads-tool/issues)
-- **Email:** vinh0407@example.com
+VinhAds is built with:
+
+* [Node.js](https://nodejs.org/)
+* [NestJS](https://nestjs.com/)
+* [Next.js](https://nextjs.org/)
+* [React](https://react.dev/)
+* [PostgreSQL](https://www.postgresql.org/)
+* [Redis](https://redis.io/)
+* [Prisma](https://www.prisma.io/)
+* [BullMQ](https://bullmq.io/)
+* [Google Gemini](https://ai.google.dev/)
+* [NVIDIA](https://www.nvidia.com/)
+* [Playwright](https://playwright.dev/)
+* [Turborepo](https://turbo.build/)
+* [Docker](https://www.docker.com/)
 
 ---
 
-*Built with ❤️ for content creators and affiliate marketers*
+**VinhAds**
+
+AI-powered content automation and affiliate marketing platform.
