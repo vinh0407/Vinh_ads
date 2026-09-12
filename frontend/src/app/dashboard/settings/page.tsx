@@ -45,6 +45,11 @@ export default function SettingsPage() {
   // Threads API config states
   const [threadsToken, setThreadsToken] = useState('');
   const [threadsUserId, setThreadsUserId] = useState('me');
+  const [threadsAppId, setThreadsAppId] = useState('1400119534865638');
+  const [threadsAppName, setThreadsAppName] = useState('VinceAuto');
+  const [appSecret, setAppSecret] = useState('315562ec6ae4054483242438e1344f2b');
+  const [exchangingToken, setExchangingToken] = useState(false);
+  const [quotaInfo, setQuotaInfo] = useState<any>(null);
 
   const profileForm = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -81,12 +86,39 @@ export default function SettingsPage() {
 
     if (typeof window !== 'undefined') {
       try {
+        const VALID_TOKEN = 'THAAT5ZAruEzOZABYll2a2JoVnoweDdWamZAPckgwcVpwMTJUY2hrZA0JlaEFVTVhBQVJ2dEdkYkQ4WkJJYUk0UnN2b3FwOHY0cXlqN0dJdm8teTBGaUhxTjhCUEN4V3pHVm1Rb0RidnJBOUpjemlUdWZA5WXpRNlhVTFdkUVhQMnhlVkRyT0NtamxZARGdaaS1HVVEZD';
+        const VALID_USER_ID = '28534125842893667';
         const storedConfig = localStorage.getItem('threads_api_config');
+
+        let tokenToUse = VALID_TOKEN;
+        let userIdToUse = VALID_USER_ID;
+
         if (storedConfig) {
-          const parsed = JSON.parse(storedConfig);
-          setThreadsToken(parsed.accessToken || '');
-          setThreadsUserId(parsed.userId || 'me');
+          try {
+            const parsed = JSON.parse(storedConfig);
+            if (parsed.accessToken && parsed.accessToken.trim() && !parsed.accessToken.startsWith('TH_FALLBACK')) {
+              tokenToUse = parsed.accessToken.trim();
+            }
+            if (parsed.userId && parsed.userId.trim() && parsed.userId !== 'me') {
+              userIdToUse = parsed.userId.trim();
+            }
+            if (parsed.appId) setThreadsAppId(parsed.appId);
+            if (parsed.appName) setThreadsAppName(parsed.appName);
+            if (parsed.appSecret) setAppSecret(parsed.appSecret);
+          } catch {}
         }
+
+        setThreadsToken(tokenToUse);
+        setThreadsUserId(userIdToUse);
+        localStorage.setItem('threads_api_config', JSON.stringify({
+          appId: threadsAppId || '1400119534865638',
+          appName: threadsAppName || 'VinceAuto',
+          appSecret: appSecret || '315562ec6ae4054483242438e1344f2b',
+          accessToken: tokenToUse,
+          userId: userIdToUse,
+          username: 'vincekanjiro',
+          updatedAt: new Date().toISOString(),
+        }));
       } catch {}
     }
   }, [user, profileForm, settingsForm]);
@@ -96,10 +128,91 @@ export default function SettingsPage() {
       localStorage.setItem('threads_api_config', JSON.stringify({
         accessToken: threadsToken,
         userId: threadsUserId,
+        appId: threadsAppId,
+        appName: threadsAppName,
+        appSecret: appSecret,
         updatedAt: new Date().toISOString(),
       }));
     }
     toast.success('⚡ Cấu hình Meta Threads API thành công!');
+  };
+
+  const handleGetLongLivedToken = async () => {
+    if (!threadsToken) {
+      toast.error('Vui lòng nhập Short-Lived Access Token.');
+      return;
+    }
+    if (!appSecret) {
+      toast.error('Vui lòng nhập Threads App Secret.');
+      return;
+    }
+    setExchangingToken(true);
+    try {
+      const res = await fetch('/api/threads/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_long_lived_token',
+          appSecret: appSecret.trim(),
+          accessToken: threadsToken.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.accessToken) {
+        setThreadsToken(data.accessToken);
+        toast.success('🎉 Đã đổi thành công Long-Lived Access Token (Có thời hạn 60 ngày)!');
+      } else {
+        toast.error(data.error || 'Đổi token thất bại');
+      }
+    } catch {
+      toast.error('Lỗi khi gọi API đổi Long-Lived Token');
+    } finally {
+      setExchangingToken(false);
+    }
+  };
+
+  const handleRefreshToken = async () => {
+    if (!threadsToken) {
+      toast.error('Vui lòng nhập Access Token cần gia hạn.');
+      return;
+    }
+    setExchangingToken(true);
+    try {
+      const res = await fetch('/api/threads/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'refresh_token',
+          accessToken: threadsToken.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.accessToken) {
+        setThreadsToken(data.accessToken);
+        toast.success('⚡ Đã gia hạn thành công Threads Access Token!');
+      } else {
+        toast.error(data.error || 'Gia hạn token thất bại');
+      }
+    } catch {
+      toast.error('Lỗi khi gọi API gia hạn token');
+    } finally {
+      setExchangingToken(false);
+    }
+  };
+
+  const handleCheckQuota = async () => {
+    try {
+      const res = await fetch(`/api/threads/insights?type=quota&access_token=${encodeURIComponent(threadsToken)}`);
+      const data = await res.json();
+      if (data.success) {
+        setQuotaInfo(data.data);
+        toast.success('Đã kiểm tra hạn ngạch bài đăng Threads (Quota)!');
+      } else {
+        toast.error(data.error || 'Không kiểm tra được hạn ngạch.');
+      }
+    } catch {
+      toast.error('Lỗi gọi API Quota');
+    }
   };
 
   const handleProfileSubmit = async (data: ProfileForm) => {
@@ -342,6 +455,33 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                      Threads App Name
+                    </label>
+                    <Input
+                      type="text"
+                      value={threadsAppName}
+                      onChange={(e) => setThreadsAppName(e.target.value)}
+                      placeholder="VD: VinceAuto"
+                      className="bg-[#0a0a0f] border-white/[0.1] text-white text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                      Threads App ID
+                    </label>
+                    <Input
+                      type="text"
+                      value={threadsAppId}
+                      onChange={(e) => setThreadsAppId(e.target.value)}
+                      placeholder="VD: 1400119534865638"
+                      className="bg-[#0a0a0f] border-white/[0.1] text-white text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-zinc-300 mb-1">
                     Threads User Access Token (Meta Long-Lived Token)
@@ -360,21 +500,92 @@ export default function SettingsPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                    Threads App Secret <span className="text-zinc-500 font-normal">(Cần thiết để đổi Long-Lived Token 60 ngày)</span>
+                  </label>
+                  <Input
+                    type="password"
+                    value={appSecret}
+                    onChange={(e) => setAppSecret(e.target.value)}
+                    placeholder="Nhập Threads App Secret từ Meta Developer Dashboard..."
+                    className="bg-[#0a0a0f] border-white/[0.1] text-white text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">
                     Threads User ID (Mặc định: "me")
                   </label>
                   <Input
                     type="text"
                     value={threadsUserId}
                     onChange={(e) => setThreadsUserId(e.target.value)}
-                    placeholder="me (hoặc ID Threads của bạn)"
+                    placeholder="me (hoặc ID Threads cá nhân)"
                     className="bg-[#0a0a0f] border-white/[0.1] text-white text-xs font-mono"
                   />
                 </div>
 
-                <div className="flex justify-end pt-2">
+                {/* OAuth & Token Actions */}
+                <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleGetLongLivedToken}
+                      disabled={exchangingToken}
+                      className="border-purple-500/30 text-purple-300 hover:bg-purple-500/10 text-xs h-8"
+                    >
+                      {exchangingToken ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                      🔑 Đổi sang Long-Lived Token (60 Ngày)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleRefreshToken}
+                      disabled={exchangingToken}
+                      className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 text-xs h-8"
+                    >
+                      ⚡ Gia Hạn Token (Refresh)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCheckQuota}
+                      className="border-sky-500/30 text-sky-300 hover:bg-sky-500/10 text-xs h-8"
+                    >
+                      📊 Kiểm Tra Hạn Ngạch (Quota)
+                    </Button>
+                  </div>
+
+                  <a
+                    href="https://developers.facebook.com/tools/debug/accesstoken/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-red-400 hover:underline font-mono"
+                  >
+                    🔍 Debug Token trong Meta Tool ↗
+                  </a>
+                </div>
+
+                {/* Quota Information Display */}
+                {quotaInfo && (
+                  <div className="p-3 bg-sky-950/20 border border-sky-500/30 rounded-lg text-xs space-y-1">
+                    <p className="font-bold text-sky-400">📊 Hạn Ngạch Đăng Bài Threads (Publishing Quota Limit):</p>
+                    {Array.isArray(quotaInfo) ? (
+                      quotaInfo.map((q: any, i: number) => (
+                        <p key={i} className="text-zinc-300 font-mono">
+                          Đã dùng: <strong className="text-white">{q.quota_usage}</strong> / {q.config?.quota_total || 250} bài (Cập nhật 24h)
+                        </p>
+                      ))
+                    ) : (
+                      <p className="text-zinc-300 font-mono">{JSON.stringify(quotaInfo)}</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-3 border-t border-white/[0.06]">
                   <Button
                     onClick={handleSaveThreadsConfig}
-                    className="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-5"
+                    className="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-5 active:scale-[0.98]"
                   >
                     <Save className="h-4 w-4 mr-1.5" />
                     Lưu Cấu Hình Threads API

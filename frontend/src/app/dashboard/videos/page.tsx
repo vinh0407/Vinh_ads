@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import AlbumPostPage from '../albumpost/page';
+import AlbumPage from '../album/page';
 
 export default function VideosPage() {
   const router = useRouter();
@@ -10,9 +10,9 @@ export default function VideosPage() {
   useEffect(() => {
     // Graceful redirect to new route
     if (typeof window !== 'undefined') {
-      router.replace('/dashboard/albumpost');
+      router.replace('/dashboard/album');
     }
   }, [router]);
 
-  return <AlbumPostPage />;
+  return <AlbumPage />;
 }

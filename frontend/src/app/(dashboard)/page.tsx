@@ -35,7 +35,7 @@ const metricCards = [
 ];
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Record<string, number>>({});
+  const [stats, setStats] = useState<any>({});
   const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
   const [loading, setLoading] = useState(true);
 

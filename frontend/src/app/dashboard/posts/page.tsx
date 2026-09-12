@@ -8,7 +8,7 @@ export default function PostsPageRedirect() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      router.replace('/dashboard/albumpost');
+      router.replace('/dashboard/album');
     }
   }, [router]);
 

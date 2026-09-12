@@ -84,3 +84,49 @@ export function renderTemplate(template: string, variables: Record<string, strin
   }
   return result;
 }
+
+export function safeSetLocalStorage<T>(key: string, data: T, maxItems = 50): boolean {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    let valueToStore: any = data;
+    if (Array.isArray(data)) {
+      valueToStore = data.slice(0, maxItems);
+    }
+    localStorage.setItem(key, JSON.stringify(valueToStore));
+    return true;
+  } catch (err: any) {
+    console.warn(`LocalStorage setItem error for key "${key}":`, err);
+    try {
+      if (Array.isArray(data)) {
+        const trimmed = data.slice(0, 30).map((item: any) => {
+          if (item && typeof item === 'object') {
+            const copy = { ...item };
+            if (typeof copy.mediaUrl === 'string' && copy.mediaUrl.startsWith('data:')) {
+              copy.mediaUrl = '';
+            }
+            if (typeof copy.thumbnailUrl === 'string' && copy.thumbnailUrl.startsWith('data:')) {
+              copy.thumbnailUrl = '';
+            }
+            if (typeof copy.productImageUrl === 'string' && copy.productImageUrl.startsWith('data:')) {
+              copy.productImageUrl = '';
+            }
+            return copy;
+          }
+          return item;
+        });
+        localStorage.setItem(key, JSON.stringify(trimmed));
+        return true;
+      }
+    } catch (retryErr) {
+      console.error(`Failed retry setItem for key "${key}":`, retryErr);
+      try {
+        if (Array.isArray(data)) {
+          localStorage.setItem(key, JSON.stringify(data.slice(0, 10)));
+          return true;
+        }
+      } catch {}
+    }
+    return false;
+  }
+}

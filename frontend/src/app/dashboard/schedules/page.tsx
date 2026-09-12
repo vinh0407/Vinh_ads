@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
+import { matchProductToContent, stripHashtags, getMultipleMatchedProducts } from '@/lib/smart-product-matcher';
+import { useEffect, useState, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -15,8 +17,8 @@ import {
 } from '@/components/ui/Table';
 import { Modal } from '@/components/ui/Modal';
 import { schedulesApi, postsApi, facebookApi, productsApi, videosApi } from '@/lib/api';
-import { Schedule, Post, FacebookPage } from '@/types';
-import { formatRelativeTime } from '@/lib/utils';
+import { Schedule, Post, FacebookPage, Product } from '@/types';
+import { formatRelativeTime, safeSetLocalStorage } from '@/lib/utils';
 import {
   Plus,
   Edit,
@@ -53,7 +55,9 @@ import {
   ChevronDown,
   ChevronUp,
   Shuffle,
-  RotateCcw
+  RotateCcw,
+  Flame,
+  Bot,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -171,6 +175,29 @@ function SchedulesContent() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [facebookPages, setFacebookPages] = useState<FacebookPage[]>(DEFAULT_PAGES);
   const [availableProducts, setAvailableProducts] = useState<StoredProduct[]>([]);
+  const [multiCommentCount, setMultiCommentCount] = useState<number>(1);
+  const [multiComments, setMultiComments] = useState<string[]>([
+    "👉 Link mua Shopee chính hãng [Ưu đãi hôm nay]: https://s.shopee.vn/9zxfyMkHS5 ⚡"
+  ]);
+
+  const updateMultiCommentsCount = (newCount: number, prodsList?: any[]) => {
+    const validCount = Math.max(1, Math.min(10, newCount));
+    setMultiCommentCount(validCount);
+    const targetProds = (prodsList && prodsList.length > 0) ? prodsList : (availableProducts.length > 0 ? availableProducts : []);
+    const list: string[] = [];
+    for (let i = 0; i < validCount; i++) {
+      if (targetProds.length > 0) {
+        const p = targetProds[i % targetProds.length];
+        const name = p.name || ("Sản phẩm Shopee #" + (i + 1));
+        const aff = p.affiliateUrl || p.shopeeUrl || p.affiliateLinks?.[0]?.affiliateUrl || "https://s.shopee.vn/9zxfyMkHS5";
+        list.push("👉 Link mua " + name + " chính hãng [Ưu đãi hôm nay]: " + aff + " ⚡");
+      } else {
+        list.push("👉 Link mua Sản phẩm Shopee #" + (i + 1) + " chính hãng [Ưu đãi hôm nay]: https://s.shopee.vn/9zxfyMkHS5 ⚡");
+      }
+    }
+    setMultiComments(list);
+    form.setValue("firstCommentText", list.join("\n---\n"));
+  };
   
   const [loading, setLoading] = useState(true);
   const [publishingBulk, setPublishingBulk] = useState(false);
@@ -188,8 +215,9 @@ function SchedulesContent() {
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [isPlatformListOpen, setIsPlatformListOpen] = useState(false);
   const [viewingCommentSchedule, setViewingCommentSchedule] = useState<ExtendedSchedule | null>(null);
+  const [customSocialList, setCustomSocialList] = useState<any[]>([]);
 
-  const loadAllAvailableProducts = async () => {
+  const loadAllAvailableProducts = useCallback(async () => {
     let combined: StoredProduct[] = [];
     if (typeof window !== 'undefined') {
       try {
@@ -239,22 +267,54 @@ function SchedulesContent() {
 
     const finalProds = Array.from(uniqueMap.values());
     setAvailableProducts(finalProds);
-  };
+  }, []);
+
+  const loadSocialAccountsFromStorage = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      // 1. Read custom_social_accounts from /dashboard/Socialmedia
+      const socRaw = localStorage.getItem('custom_social_accounts');
+      const parsedSoc: any[] = socRaw ? JSON.parse(socRaw) : [];
+
+      // 2. Read threads_api_config from /dashboard/settings
+      const thApiRaw = localStorage.getItem('threads_api_config');
+      if (thApiRaw) {
+        try {
+          const parsedTh = JSON.parse(thApiRaw);
+          if (parsedTh.accessToken) {
+            setThreadsToken(parsedTh.accessToken);
+            setThreadsUserId(parsedTh.userId || 'me');
+          }
+        } catch {}
+      } else {
+        const token = localStorage.getItem('threads_user_token') || '';
+        const uid = localStorage.getItem('threads_user_id') || '';
+        if (token) setThreadsToken(token);
+        if (uid) setThreadsUserId(uid);
+      }
+
+      setCustomSocialList(parsedSoc);
+    } catch (e) {
+      console.warn('Error loading custom social accounts:', e);
+    }
+  }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('threads_user_token') || '';
-    const uid = localStorage.getItem('threads_user_id') || '';
-    setThreadsToken(token);
-    setThreadsUserId(uid);
-
+    loadSocialAccountsFromStorage();
     loadAllAvailableProducts();
-  }, []);
+  }, [loadSocialAccountsFromStorage, loadAllAvailableProducts]);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      loadSocialAccountsFromStorage();
+    }
+  }, [isModalOpen, loadSocialAccountsFromStorage]);
 
   useEffect(() => {
     if (showProductPicker) {
       loadAllAvailableProducts();
     }
-  }, [showProductPicker]);
+  }, [showProductPicker, loadAllAvailableProducts]);
 
   const loadMediaAlbumPosts = useCallback(async () => {
     let localItems: any[] = [];
@@ -266,7 +326,7 @@ function SchedulesContent() {
             {
               id: 'demo_album_1',
               title: 'Bộ Lụa Lạnh Cao Cấp Cho Bé Mặc Nhà Mùa Hè',
-              caption: 'Đánh giá bộ lụa lạnh thoáng khí cực kỳ thích hợp cho bé vận động ngày hè. Vải siêu mềm mát, không xù lông.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/9zxfyMkHS5\n#ShopeeAffiliate #KhangiaycaocapTopGia',
+              caption: 'Đánh giá bộ lụa lạnh thoáng khí cực kỳ thích hợp cho bé vận động ngày hè. Vải siêu mềm mát, không xù lông.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/9zxfyMkHS5\n ',
               comment: '👉 Link đặt mua Shopee chính hãng nhận voucher giảm giá hôm nay: https://s.shopee.vn/9zxfyMkHS5 ⚡',
               mediaType: 'IMAGE',
               mediaUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80',
@@ -278,7 +338,7 @@ function SchedulesContent() {
             {
               id: 'demo_album_2',
               title: 'Review Tai Nghe Bluetooth Chống Ồn ANC Pin 40H',
-              caption: 'Trải nghiệm tai nghe không dây chống ồn chủ động ANC siêu đỉnh. Âm bass ấm, đàm thoại nét căng trong tầm giá dưới 500k.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/8A1b2c3d4e\n#ReviewCongNghe #ShopeeTech #TaiNgheBluetooth',
+              caption: 'Trải nghiệm tai nghe không dây chống ồn chủ động ANC siêu đỉnh. Âm bass ấm, đàm thoại nét căng trong tầm giá dưới 500k.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/8A1b2c3d4e\n  ',
               comment: '👉 Link mua Tai nghe Bluetooth chính hãng [Giảm 40%]: https://s.shopee.vn/8A1b2c3d4e 🎧',
               mediaType: 'VIDEO',
               mediaUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
@@ -290,7 +350,7 @@ function SchedulesContent() {
             {
               id: 'demo_album_3',
               title: 'Nồi Chiên Không Dầu Điện Tử 8L Cực Tiện Cho Gia Đình',
-              caption: 'Bí quyết nướng gà giòn rụm không cần dầu mỡ với nồi chiên không dầu thế hệ mới. Mặt kính trong suốt dễ quan sát thực phẩm.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/7B2c3d4e5f\n#GiaDungThongMinh #NoiChienKhongDau #ShopeeHome',
+              caption: 'Bí quyết nướng gà giòn rụm không cần dầu mỡ với nồi chiên không dầu thế hệ mới. Mặt kính trong suốt dễ quan sát thực phẩm.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/7B2c3d4e5f\n  ',
               comment: '👉 Link đặt mua Nồi chiên không dầu 8L chính hãng: https://s.shopee.vn/7B2c3d4e5f 🍗',
               mediaType: 'IMAGE',
               mediaUrl: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=600&q=80',
@@ -300,7 +360,7 @@ function SchedulesContent() {
               createdAt: new Date().toISOString(),
             },
           ];
-          localStorage.setItem('custom_album_posts', JSON.stringify(localItems));
+          safeSetLocalStorage('custom_album_posts', localItems, 60);
         }
       } catch (e) {
         console.warn('Failed to load custom_album_posts:', e);
@@ -445,32 +505,85 @@ function SchedulesContent() {
 
   const selectedTargets = form.watch('selectedTargets') || [];
 
-  const registeredPlatforms = [
-    ...facebookPages.map(p => ({
-      id: p.pageId || p.id,
-      label: "📘 Facebook Page: " + p.pageName,
-      icon: '📘',
-      type: 'FACEBOOK'
-    })),
-    ...(threadsToken && threadsUserId ? [{
-      id: 'THREADS',
-      label: '🧵 Meta Threads Account',
-      icon: '🧵',
-      type: 'THREADS'
-    }] : []),
-    ...((typeof window !== 'undefined' && localStorage.getItem('tiktok_user_token')) ? [{
-      id: 'TIKTOK',
-      label: '🎵 TikTok Video 9:16',
-      icon: '🎵',
-      type: 'TIKTOK'
-    }] : []),
-    ...((typeof window !== 'undefined' && localStorage.getItem('youtube_user_token')) ? [{
-      id: 'YOUTUBE_SHORTS',
-      label: '▶️ YouTube Shorts Channel',
-      icon: '▶️',
-      type: 'YOUTUBE'
-    }] : []),
-  ];
+  const registeredPlatforms = useMemo(() => {
+    const platformMap = new Map<string, { id: string; label: string; icon: string; type: string }>();
+
+    // 1. Add custom social accounts from /dashboard/Socialmedia
+    customSocialList.forEach((acc: any) => {
+      const pType = acc.platform || 'FACEBOOK';
+      const icon = pType === 'THREADS' ? '🧵' : pType === 'YOUTUBE' ? '▶️' : pType === 'INSTAGRAM' ? '📸' : '📘';
+      const labelPrefix = pType === 'THREADS' ? 'Meta Threads: ' : pType === 'YOUTUBE' ? 'YouTube: ' : pType === 'INSTAGRAM' ? 'Instagram: ' : 'FB Page: ';
+      const accId = acc.channelId || acc.id;
+      if (accId && acc.isActive !== false) {
+        platformMap.set(accId, {
+          id: accId,
+          label: `${icon} ${labelPrefix}${acc.name}`,
+          icon,
+          type: pType,
+        });
+      }
+    });
+
+    // 2. Add Facebook pages
+    facebookPages.forEach((p) => {
+      const pId = p.pageId || p.id;
+      if (pId && !platformMap.has(pId)) {
+        platformMap.set(pId, {
+          id: pId,
+          label: "📘 Facebook Page: " + p.pageName,
+          icon: '📘',
+          type: 'FACEBOOK',
+        });
+      }
+    });
+
+    // 3. Add Threads from Settings if not in customSocialList
+    const hasThreads = Array.from(platformMap.values()).some((item) => item.type === 'THREADS');
+    if (!hasThreads && threadsToken) {
+      platformMap.set('THREADS', {
+        id: 'THREADS',
+        label: '🧵 Meta Threads: @vincekanjiro',
+        icon: '🧵',
+        type: 'THREADS',
+      });
+    }
+
+    // 4. Add TikTok if configured
+    if (typeof window !== 'undefined' && localStorage.getItem('tiktok_user_token')) {
+      if (!platformMap.has('TIKTOK')) {
+        platformMap.set('TIKTOK', {
+          id: 'TIKTOK',
+          label: '🎵 TikTok Video 9:16',
+          icon: '🎵',
+          type: 'TIKTOK',
+        });
+      }
+    }
+
+    // 5. Add YouTube Shorts if configured
+    if (typeof window !== 'undefined' && localStorage.getItem('youtube_user_token')) {
+      if (!platformMap.has('YOUTUBE_SHORTS')) {
+        platformMap.set('YOUTUBE_SHORTS', {
+          id: 'YOUTUBE_SHORTS',
+          label: '▶️ YouTube Shorts Channel',
+          icon: '▶️',
+          type: 'YOUTUBE',
+        });
+      }
+    }
+
+    // Fallback if completely empty
+    if (platformMap.size === 0) {
+      platformMap.set('1282948524895927', {
+        id: '1282948524895927',
+        label: '📘 Facebook Page: Loài mèo gắn link',
+        icon: '📘',
+        type: 'FACEBOOK',
+      });
+    }
+
+    return Array.from(platformMap.values());
+  }, [facebookPages, customSocialList, threadsToken]);
 
   const registeredIds = registeredPlatforms.map(p => p.id);
   const activeSelectedTargets = selectedTargets.filter(id => registeredIds.includes(id));
@@ -786,7 +899,8 @@ function SchedulesContent() {
       let successCount = 0;
 
       // Facebook Fanpage Post + First Comment via API Proxy
-      if (targets.includes('1282948524895927')) {
+      const isFbSelected = targets.some(t => t === '1282948524895927' || customSocialList.some(a => (a.channelId === t || a.id === t) && a.platform === 'FACEBOOK'));
+      if (isFbSelected) {
         const page = facebookPages[0] || DEFAULT_PAGES[0];
         const pageToken = page.accessToken || PAGE_TOKENS['1282948524895927'];
 
@@ -809,34 +923,74 @@ function SchedulesContent() {
           if (apiJson.commentNotice) {
             toast.success(apiJson.commentNotice, { duration: 4000 });
           }
-        } else if (apiJson.error) {
-          toast.error(apiJson.error, { id: toastId });
-          setPublishingBulk(false);
-          return;
         }
       }
 
       // Meta Threads Post + Multi-Comment Replies
-      if (targets.includes('THREADS')) {
+      const threadsAccountMatch = customSocialList.find(a => (a.channelId === targets.find(t => t === a.channelId || t === a.id) || a.id === targets.find(t => t === a.id)) && a.platform === 'THREADS');
+      const isThreadsSelected = targets.includes('THREADS') || !!threadsAccountMatch || targets.some(t => t.toLowerCase().includes('th'));
+
+      if (isThreadsSelected) {
+        const VALID_VINCE_TOKEN = 'THAAT5ZAruEzOZABYll2a2JoVnoweDdWamZAPckgwcVpwMTJUY2hrZA0JlaEFVTVhBQVJ2dEdkYkQ4WkJJYUk0UnN2b3FwOHY0cXlqN0dJdm8teTBGaUhxTjhCUEN4V3pHVm1Rb0RidnJBOUpjemlUdWZA5WXpRNlhVTFdkUVhQMnhlVkRyT0NtamxZARGdaaS1HVVEZD';
+        const VALID_VINCE_USER_ID = '28534125842893667';
+
+        let tokenToUse = threadsAccountMatch?.token || threadsToken;
+        let userIdToUse = threadsAccountMatch?.channelId || threadsUserId;
+
+        if (!tokenToUse || tokenToUse.startsWith('TH_FALLBACK') || tokenToUse.length < 20) {
+          if (typeof window !== 'undefined') {
+            try {
+              const storedThConfig = localStorage.getItem('threads_api_config');
+              if (storedThConfig) {
+                const parsed = JSON.parse(storedThConfig);
+                if (parsed.accessToken && parsed.accessToken.length > 20) tokenToUse = parsed.accessToken;
+                if (parsed.userId && parsed.userId !== 'me') userIdToUse = parsed.userId;
+              }
+            } catch {}
+          }
+        }
+
+        if (!tokenToUse || tokenToUse.length < 20) tokenToUse = VALID_VINCE_TOKEN;
+        if (!userIdToUse || userIdToUse === 'me') userIdToUse = VALID_VINCE_USER_ID;
+
+        // Intelligently match comment product image to the exact product in firstCommentText
+        let finalCommentImg = prodImg;
+        if (firstCommentText && availableProducts.length > 0) {
+          const commentLower = firstCommentText.toLowerCase();
+          const matchedProd = availableProducts.find(p => p.imageUrl && p.name && (
+            commentLower.includes(p.name.toLowerCase().slice(0, 15)) ||
+            (p.name.toLowerCase().includes('giấy') && commentLower.includes('giấy')) ||
+            (p.name.toLowerCase().includes('topgia') && commentLower.includes('topgia'))
+          ));
+          if (matchedProd && matchedProd.imageUrl) {
+            finalCommentImg = matchedProd.imageUrl;
+          }
+        }
+
         try {
           const thRes = await fetch('/api/threads/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              threadsUserId: threadsUserId || 'me',
-              accessToken: threadsToken,
+              threadsUserId: userIdToUse || 'me',
+              accessToken: tokenToUse,
               caption: caption,
               firstCommentText: firstCommentEnabled ? firstCommentText : '',
               firstCommentEnabled: firstCommentEnabled,
-              mediaUrl: selectedVideo?.url || prodImg || undefined,
+              textOnlyMainPost: true,
+              commentImageUrl: finalCommentImg || selectedVideo?.url || undefined,
             }),
           });
           const thJson = await thRes.json();
           if (thJson.success) {
             successCount++;
+            toast.success(thJson.message || '🎉 Đã đăng bài & bình luận lên Meta Threads thành công!');
+          } else if (thJson.error) {
+            toast.error(thJson.error);
           }
-        } catch (thErr) {
+        } catch (thErr: any) {
           console.warn('Threads publish error:', thErr);
+          toast.error(`⚠️ Lỗi kết nối Threads: ${thErr.message || 'Không gửi được bài lên Threads.'}`);
         }
       }
 
@@ -1026,6 +1180,106 @@ function SchedulesContent() {
     toast.success('Đã đặt thời gian: Ngay bây giờ');
   };
 
+  const handleRandomThreadsWithShopee = useCallback(async () => {
+    try {
+      const res = await fetch('/api/threads/trending?force=true');
+      const json = await res.json();
+      const pool = (json && json.success && Array.isArray(json.data) && json.data.length > 0) ? json.data : [];
+      if (pool.length === 0) {
+        toast.error('Không cào được bài Threads từ AutoSpy.');
+        return;
+      }
+
+      const randomThreads = pool[Math.floor(Math.random() * pool.length)];
+      const rawContent = randomThreads.content || randomThreads.title || '';
+      const cleanCap = stripHashtags(rawContent.replace(/https?:\/\/[^\s]+/gi, '').trim());
+
+      const matchedRes = matchProductToContent(cleanCap, availableProducts as unknown as Product[]);
+      const matchedShopee: StoredProduct | null = (matchedRes?.product as unknown as StoredProduct) || (availableProducts.length > 0 ? availableProducts[0] : null);
+
+      const affLink = matchedRes?.affiliateUrl || matchedShopee?.affiliateUrl || matchedShopee?.shopeeUrl || 'https://s.shopee.vn/9zxfyMkHS5';
+      const prodName = matchedShopee?.name || 'Sản phẩm Shopee chính hãng';
+      const prodImg = matchedShopee?.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80';
+
+      const prodsToUse = availableProducts.length >= 10 ? availableProducts.slice(0, 10) : availableProducts;
+      const commentBlocks = prodsToUse.map((p, idx) => '👉 Link mua [' + (p.name || 'Sản phẩm Shopee') + '] chính hãng [Ưu đãi hôm nay]: ' + (p.affiliateUrl || p.shopeeUrl || 'https://s.shopee.vn/9zxfyMkHS5') + ' ⚡');
+      const multiCommentStr = commentBlocks.join('\n---\n');
+
+      form.setValue('caption', cleanCap);
+      form.setValue('productName', prodName);
+      form.setValue('affiliateUrl', affLink);
+      form.setValue('productImageUrl', prodImg);
+      form.setValue('firstCommentText', multiCommentStr);
+      form.setValue('firstCommentEnabled', true);
+      form.setValue('firstCommentHasImage', true);
+
+      setSelectedVideo(null);
+      setSelectedPostImage(null);
+
+      setEditingSchedule(null);
+      setIsModalOpen(true);
+
+      toast.success("⚡ Đã chọn ngẫu nhiên bài Threads: \"" + (randomThreads.authorName || '@threads') + ": " + cleanCap.slice(0, 30) + "...\" kèm 10 Link Shopee trong bình luận!");
+    } catch {
+      toast.error('Không thể lấy bài Threads ngẫu nhiên.');
+    }
+  }, [availableProducts, form]);
+
+  const handleRandomNewsWithShopee = useCallback(async () => {
+    try {
+      const res = await fetch('/api/fetch-live-news');
+      const json = await res.json();
+      const list = json?.data || json?.articles;
+      const pool = (json && json.success && Array.isArray(list) && list.length > 0) ? list : [];
+      if (pool.length === 0) {
+        toast.error('Không cào được bài báo từ Radar Tin Tức.');
+        return;
+      }
+
+      const randomNews = pool[Math.floor(Math.random() * pool.length)];
+      const rawContent = (randomNews.title || '') + '\n\n' + (randomNews.summary || '');
+      const cleanCap = stripHashtags(rawContent.replace(/https?:\/\/[^\s]+/gi, '').trim());
+
+      const matchedRes = matchProductToContent(cleanCap, availableProducts as unknown as Product[]);
+      const matchedShopee: StoredProduct | null = (matchedRes?.product as unknown as StoredProduct) || (availableProducts.length > 0 ? availableProducts[0] : null);
+
+      const affLink = matchedRes?.affiliateUrl || matchedShopee?.affiliateUrl || matchedShopee?.shopeeUrl || 'https://s.shopee.vn/9zxfyMkHS5';
+      const prodName = matchedShopee?.name || 'Sản phẩm Shopee chính hãng';
+      const newsImg = randomNews.thumbnailUrl || randomNews.imageUrl || matchedShopee?.imageUrl || '';
+
+      const prodsToUse = availableProducts.length >= 10 ? availableProducts.slice(0, 10) : availableProducts;
+      const commentBlocks = prodsToUse.map((p, idx) => '👉 Link mua [' + (p.name || 'Sản phẩm Shopee') + '] chính hãng [Ưu đãi hôm nay]: ' + (p.affiliateUrl || p.shopeeUrl || 'https://s.shopee.vn/9zxfyMkHS5') + ' ⚡');
+      const multiCommentStr = commentBlocks.join('\n---\n');
+
+      form.setValue('caption', cleanCap);
+      form.setValue('productName', prodName);
+      form.setValue('affiliateUrl', affLink);
+      form.setValue('productImageUrl', newsImg || matchedShopee?.imageUrl || '');
+      form.setValue('firstCommentText', multiCommentStr);
+      form.setValue('firstCommentEnabled', true);
+      form.setValue('firstCommentHasImage', true);
+
+      if (newsImg) {
+        setSelectedPostImage({
+          name: randomNews.title || 'Ảnh Minh Họa Bài Báo',
+          size: 'Radar News',
+          previewUrl: newsImg,
+        });
+        setSelectedVideo(null);
+      } else {
+        setSelectedVideo(null);
+        setSelectedPostImage(null);
+      }
+
+      setEditingSchedule(null);
+      setIsModalOpen(true);
+
+      toast.success("⚡ Đã chọn ngẫu nhiên bài Báo: \"" + randomNews.title + "\" kèm 10 Link Shopee trong bình luận!");
+    } catch {
+      toast.error('Không thể lấy bài báo ngẫu nhiên.');
+    }
+  }, [availableProducts, form]);
+
   const handleReupRandomFromAlbum = useCallback(() => {
     let albumPosts: any[] = [];
     if (typeof window !== 'undefined') {
@@ -1041,7 +1295,7 @@ function SchedulesContent() {
         {
           id: 'demo_album_1',
           title: 'Bộ Lụa Lạnh Cao Cấp Cho Bé Mặc Nhà Mùa Hè',
-          caption: 'Đánh giá bộ lụa lạnh thoáng khí cực kỳ thích hợp cho bé vận động ngày hè. Vải siêu mềm mát, không xù lông.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/9zxfyMkHS5\n#ShopeeAffiliate',
+          caption: 'Đánh giá bộ lụa lạnh thoáng khí cực kỳ thích hợp cho bé vận động ngày hè. Vải siêu mềm mát, không xù lông.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/9zxfyMkHS5\n',
           comment: '👉 Link đặt mua Shopee chính hãng nhận voucher giảm giá hôm nay: https://s.shopee.vn/9zxfyMkHS5 ⚡',
           mediaType: 'IMAGE',
           mediaUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80',
@@ -1050,7 +1304,7 @@ function SchedulesContent() {
         {
           id: 'demo_album_2',
           title: 'Review Tai Nghe Bluetooth Chống Ồn ANC Pin 40H',
-          caption: 'Trải nghiệm tai nghe không dây chống ồn chủ động ANC siêu đỉnh. Âm bass ấm, đàm thoại nét căng trong tầm giá dưới 500k.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/8A1b2c3d4e\n#ReviewCongNghe #ShopeeTech',
+          caption: 'Trải nghiệm tai nghe không dây chống ồn chủ động ANC siêu đỉnh. Âm bass ấm, đàm thoại nét căng trong tầm giá dưới 500k.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/8A1b2c3d4e\n ',
           comment: '👉 Link mua Tai nghe Bluetooth chính hãng [Giảm 40%]: https://s.shopee.vn/8A1b2c3d4e 🎧',
           mediaType: 'VIDEO',
           mediaUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
@@ -1059,7 +1313,7 @@ function SchedulesContent() {
         {
           id: 'demo_album_3',
           title: 'Nồi Chiên Không Dầu Điện Tử 8L Cực Tiện Cho Gia Đình',
-          caption: 'Bí quyết nướng gà giòn rụm không cần dầu mỡ với nồi chiên không dầu thế hệ mới. Mặt kính trong suốt dễ quan sát thực phẩm.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/7B2c3d4e5f\n#GiaDungThongMinh #NoiChienKhongDau',
+          caption: 'Bí quyết nướng gà giòn rụm không cần dầu mỡ với nồi chiên không dầu thế hệ mới. Mặt kính trong suốt dễ quan sát thực phẩm.\n\n🛒 Link Shopee Affiliate: https://s.shopee.vn/7B2c3d4e5f\n ',
           comment: '👉 Link đặt mua Nồi chiên không dầu 8L chính hãng: https://s.shopee.vn/7B2c3d4e5f 🍗',
           mediaType: 'IMAGE',
           mediaUrl: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=600&q=80',
@@ -1076,17 +1330,6 @@ function SchedulesContent() {
     // Pick 1 RANDOM post from albumPosts (supports Text, Image, or Video)
     const randomPost = albumPosts[Math.floor(Math.random() * albumPosts.length)];
 
-    // Get RANDOM Shopee product
-    let randomShopee: StoredProduct | null = null;
-    if (availableProducts && availableProducts.length > 0) {
-      randomShopee = availableProducts[Math.floor(Math.random() * availableProducts.length)];
-    }
-
-    const affLink = randomShopee?.affiliateUrl || randomShopee?.shopeeUrl || 'https://s.shopee.vn/9zxfyMkHS5';
-    const prodName = randomShopee?.name || 'Sản phẩm Shopee chính hãng';
-    const mediaUrl = randomPost.mediaUrl || randomPost.thumbnailUrl || randomPost.storageKey || '';
-    const prodImg = randomShopee?.imageUrl || mediaUrl;
-
     // Clean caption and construct new caption without links (link ONLY in comment)
     const baseContent = randomPost.caption || randomPost.title || '';
     const cleanCap = baseContent
@@ -1094,7 +1337,17 @@ function SchedulesContent() {
       .replace(/(?:shopee\.vn|s\.shopee\.vn|vn\.shp\.ee|shorten\.asia)[^\s]*/gi, '')
       .trim();
 
-    const fullCaption = cleanCap + "\n#ReUpRandom #ShopeeAffiliate #" + prodName.replace(/\s+/g, '');
+    const fullCaption = stripHashtags(cleanCap);
+
+    // SMART CONTEXTUAL PRODUCT MATCHING (Food -> Topgia Tissues, Motorbikes -> Motowolf, Skincare -> Lifebuoy, etc.)
+    const matchedRes = matchProductToContent(fullCaption, availableProducts as unknown as Product[]);
+    const matchedShopee: StoredProduct | null = (matchedRes?.product as unknown as StoredProduct) || (availableProducts.length > 0 ? availableProducts[0] : null);
+
+    const affLink = matchedRes?.affiliateUrl || matchedShopee?.affiliateUrl || matchedShopee?.shopeeUrl || 'https://s.shopee.vn/9zxfyMkHS5';
+    const prodName = matchedShopee?.name || 'Sản phẩm Shopee chính hãng';
+    const mediaUrl = randomPost.mediaUrl || randomPost.thumbnailUrl || randomPost.storageKey || '';
+    const prodImg = matchedShopee?.imageUrl || mediaUrl;
+
     const firstComment = "👉 Link mua " + prodName + " chính hãng [Ưu đãi hôm nay]: " + affLink + " ⚡";
 
     // Set form values
@@ -1102,7 +1355,7 @@ function SchedulesContent() {
     form.setValue('productName', prodName);
     form.setValue('affiliateUrl', affLink);
     form.setValue('productImageUrl', prodImg);
-    form.setValue('firstCommentText', firstComment);
+    updateMultiCommentsCount(multiCommentCount, availableProducts);
     form.setValue('firstCommentEnabled', true);
     form.setValue('firstCommentHasImage', true);
 
@@ -1204,29 +1457,30 @@ function SchedulesContent() {
             <span className="text-xs font-mono text-zinc-400">FB FANPAGE • THREADS • TIKTOK • SHORTS</span>
           </div>
           <h1 className="text-[22px] font-extrabold tracking-tight text-white">
-            Đăng Bài
+            Đăng Ngay
           </h1>
           <p className="text-sm text-zinc-400 mt-0.5">
-            Quản lý bài đăng, chọn nền tảng mạng xã hội, lên lịch đăng bài và xuất bản đồng thời kèm link Shopee Affiliate riêng biệt
+            Đăng bài tức thì đa kênh (Facebook Fanpage, Meta Threads, TikTok, YouTube Shorts) kèm link Shopee Affiliate ở bình luận
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
           <Button
             onClick={openInstantBulkModal}
-            className="bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 font-semibold text-xs active:scale-[0.98]"
-          >
-            <Zap className="h-3.5 w-3.5 mr-1.5 text-amber-400" />
-            Đăng Ngay Tức Thì
-          </Button>
-
-          <Button
-            onClick={openCreateModal}
             className="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs shadow-lg shadow-red-600/20 active:scale-[0.98]"
           >
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            Đăng Bài Mới / Lên Lịch
+            <Zap className="h-3.5 w-3.5 mr-1.5" />
+            ⚡ Đăng Ngay Tức Thì
           </Button>
+
+          <Link href="/dashboard/missions">
+            <Button
+              className="bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 font-semibold text-xs active:scale-[0.98]"
+            >
+              <Bot className="h-3.5 w-3.5 mr-1.5 text-amber-400" />
+              🤖 AI Missions (Hẹn Giờ 24/7)
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -1526,17 +1780,6 @@ function SchedulesContent() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={handleReupRandomFromAlbum}
-                className="h-8 border-purple-500/40 text-purple-300 hover:bg-purple-500/10 text-xs font-semibold flex items-center gap-1.5"
-              >
-                <Shuffle className="w-3.5 h-3.5 text-purple-400" />
-                Lấy Bài ReUp Ngẫu Nhiên (Kho Album)
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
                 onClick={() => {
                   setIsModalOpen(false);
                   setEditingSchedule(null);
@@ -1552,31 +1795,14 @@ function SchedulesContent() {
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
             <div className="md:col-span-5 space-y-4">
-              <div className="flex items-center bg-[#18181f] p-1 rounded-lg border border-white/[0.08]">
-                <button
-                  type="button"
-                  onClick={() => setModalMode('SCHEDULE')}
-                  className={"flex-1 py-2 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 " + (
-                    modalMode === 'SCHEDULE'
-                      ? 'bg-red-600 text-white shadow'
-                      : 'text-zinc-400 hover:text-white'
-                  )}
-                >
-                  <Clock className="h-3.5 w-3.5" />
-                  Lên Lịch Tự Động (Giờ VN)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModalMode('INSTANT')}
-                  className={"flex-1 py-2 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 " + (
-                    modalMode === 'INSTANT'
-                      ? 'bg-amber-500 text-black font-bold shadow'
-                      : 'text-zinc-400 hover:text-white'
-                  )}
-                >
-                  <Zap className="h-3.5 w-3.5" />
-                  Đăng Ngay Tức Thì
-                </button>
+              <div className="flex items-center justify-between bg-[#18181f] p-2.5 rounded-lg border border-amber-500/30 text-amber-300 text-xs font-semibold">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-amber-400" />
+                  <span>Chế độ: <strong>Đăng Ngay Tức Thì (Instant Publish)</strong></span>
+                </div>
+                <Link href="/dashboard/missions" className="text-red-400 hover:underline text-[11px] font-mono flex items-center gap-1">
+                  🤖 Lên lịch với AI Missions
+                </Link>
               </div>
 
               <div className="p-3.5 rounded-xl border border-white/[0.08] bg-[#18181f] space-y-2">
@@ -1690,11 +1916,22 @@ function SchedulesContent() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={handleReupRandomFromAlbum}
-                    className="h-9 border-purple-500/50 bg-purple-950/30 text-purple-300 hover:bg-purple-500/20 text-xs font-bold w-full col-span-1 sm:col-span-2 shadow-sm"
+                    onClick={handleRandomThreadsWithShopee}
+                    className="h-9 border-amber-500/50 bg-amber-950/30 text-amber-300 hover:bg-amber-500/20 text-xs font-bold w-full shadow-sm"
                   >
-                    <Shuffle className="w-3.5 h-3.5 mr-1.5 text-purple-400 animate-pulse" />
-                    🎲 Chọn &amp; ReUp Ngẫu Nhiên Kho Album (Text / Ảnh / Video + Link Shopee Random)
+                    <Flame className="w-3.5 h-3.5 mr-1.5 text-amber-400 animate-pulse" />
+                    🎲 Chọn Ngẫu Nhiên Bài Threads + Link Shopee Random (Chỉ Bình Luận)
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRandomNewsWithShopee}
+                    className="h-9 border-rose-500/50 bg-rose-950/30 text-rose-300 hover:bg-rose-500/20 text-xs font-bold w-full shadow-sm"
+                  >
+                    <Newspaper className="w-3.5 h-3.5 mr-1.5 text-rose-400 animate-pulse" />
+                    📰 Chọn Ngẫu Nhiên Bài Báo + Link Shopee Random (Chỉ Bình Luận)
                   </Button>
 
                   <Button
@@ -1885,7 +2122,7 @@ function SchedulesContent() {
                         const linkPart = affUrl ? ("\n🛒 Link mua hàng săn voucher: " + affUrl) : '';
                         form.setValue(
                           'caption',
-                          "💥 SỐC TỤT QUẦN! " + prodName + " đang xả kho giảm giá kịch sàn hôm nay!\n👉 Xem ngay trải nghiệm thực tế trong video." + linkPart + "\n\n#sansale #shopee #review #dealhot #fyp"
+                          "💥 SỐC TỤT QUẦN! " + prodName + " đang xả kho giảm giá kịch sàn hôm nay!\n👉 Xem ngay trải nghiệm thực tế trong video." + linkPart + ""
                         );
                         toast.success('Đã gán mẫu Săn Sale!');
                       }}
@@ -1901,7 +2138,7 @@ function SchedulesContent() {
                         const linkPart = affUrl ? ("\n🛒 Link mua hàng chính hãng: " + affUrl) : '';
                         form.setValue(
                           'caption',
-                          "Chân thực 100%! Sau 7 ngày dùng thử " + prodName + " thì đây là cảm nhận của mình.\nƯu điểm vượt trội: Ngon - Bổ - Rẻ đáng tiền từng xu!\n👉 Chi tiết xem ở video." + linkPart + "\n\n#reviewdientu #shopeevietnam #affiliate #meohay"
+                          "Chân thực 100%! Sau 7 ngày dùng thử " + prodName + " thì đây là cảm nhận của mình.\nƯu điểm vượt trội: Ngon - Bổ - Rẻ đáng tiền từng xu!\n👉 Chi tiết xem ở video." + linkPart + ""
                         );
                         toast.success('Đã gán mẫu Review!');
                       }}
@@ -1917,7 +2154,7 @@ function SchedulesContent() {
                         const linkPart = affUrl ? ("\n🛒 Link chuẩn Store chính hãng: " + affUrl) : '';
                         form.setValue(
                           'caption',
-                          "⚠️ CẢNH BÁO: Đừng mua " + prodName + " nếu bạn chưa xem video này!\nRất nhiều bên đang bán hàng nhái chất lượng kém." + linkPart + "\n\n#canhbao #muasamthongminh #shopee #xuhuong"
+                          "⚠️ CẢNH BÁO: Đừng mua " + prodName + " nếu bạn chưa xem video này!\nRất nhiều bên đang bán hàng nhái chất lượng kém." + linkPart + ""
                         );
                         toast.success('Đã gán mẫu Cảnh Báo!');
                       }}
@@ -1933,7 +2170,7 @@ function SchedulesContent() {
                         const linkPart = affUrl ? ("\n🛒 Chi tiết cấu hình và quà tặng tại: " + affUrl) : '';
                         form.setValue(
                           'caption',
-                          "💻 ĐỘT PHÁ CÔNG NGHỆ: Trải nghiệm thực tế " + prodName + " cực đỉnh!\nHiệu năng mượt mà, thiết kế hiện đại vượt xa kỳ vọng." + linkPart + "\n\n#congnghe #techreview #ai #shopeeaffiliate"
+                          "💻 ĐỘT PHÁ CÔNG NGHỆ: Trải nghiệm thực tế " + prodName + " cực đỉnh!\nHiệu năng mượt mà, thiết kế hiện đại vượt xa kỳ vọng." + linkPart + ""
                         );
                         toast.success('Đã gán mẫu Công Nghệ!');
                       }}
@@ -1948,7 +2185,7 @@ function SchedulesContent() {
                         const linkPart = affUrl ? ("\n🛒 Săn voucher sản phẩm hot tại: " + affUrl) : '';
                         form.setValue(
                           'caption',
-                          "📰 TIN NÓNG BẮT TREND: Cập nhật sự kiện hot nhất hôm nay!\nXem ngay video để không bỏ lỡ những diễn biến quan trọng nhất." + linkPart + "\n\n#tinnong #trending #viralnews #xuhuong"
+                          "📰 TIN NÓNG BẮT TREND: Cập nhật sự kiện hot nhất hôm nay!\nXem ngay video để không bỏ lỡ những diễn biến quan trọng nhất." + linkPart + ""
                         );
                         toast.success('Đã gán mẫu Tin Tức & Trend!');
                       }}
@@ -1963,7 +2200,7 @@ function SchedulesContent() {
                         const linkPart = affUrl ? ("\n🛒 Link deal hời: " + affUrl) : '';
                         form.setValue(
                           'caption',
-                          "⚡ BẮT TREND TIKTOK 2026: Trải nghiệm không thể bỏ lỡ!\nFollow kênh ngay để săn deal ngon và xem thêm nhiều video viral mỗi ngày nhé!" + linkPart + "\n\n#tiktoktrend #viral #xuhuong2026"
+                          "⚡ BẮT TREND TIKTOK 2026: Trải nghiệm không thể bỏ lỡ!\nFollow kênh ngay để săn deal ngon và xem thêm nhiều video viral mỗi ngày nhé!" + linkPart + ""
                         );
                         toast.success('Đã gán mẫu Bắt Trend TikTok!');
                       }}
@@ -2006,14 +2243,73 @@ function SchedulesContent() {
                 </div>
 
                 {form.watch('firstCommentEnabled') && (
-                  <div className="space-y-2 pt-1">
-                    <Textarea
-                      rows={2}
-                      {...form.register('firstCommentText')}
-                      placeholder="🛒 Link đặt mua sản phẩm chính hãng nhận voucher: https://s.shopee.vn/..."
-                      className="bg-[#111117] border-white/[0.1] text-white font-mono text-xs"
-                    />
-                    <div className="flex items-center gap-2">
+                  <div className="space-y-3 pt-2 border-t border-emerald-500/20">
+                    <div className="flex flex-wrap items-center justify-between gap-2 bg-[#111117] p-2.5 rounded-lg border border-white/[0.08]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">Số Lượng Bình Luận Sản Phẩm:</span>
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/30">
+                          {multiCommentCount} Bình Luận ({multiCommentCount} SP / {multiCommentCount} Link Khác Nhau)
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => updateMultiCommentsCount(multiCommentCount - 1)}
+                          disabled={multiCommentCount <= 1}
+                          className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-white text-xs font-bold transition-all"
+                        >
+                          ➖ Bớt
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateMultiCommentsCount(multiCommentCount + 1)}
+                          disabled={multiCommentCount >= 10}
+                          className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-white text-xs font-bold transition-all"
+                        >
+                          ➕ Thêm
+                        </button>
+
+                        <div className="flex items-center gap-1 border-l border-white/[0.1] pl-2 ml-1">
+                          {[1, 3, 5, 10].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => updateMultiCommentsCount(num)}
+                              className={"px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-all " + (multiCommentCount === num ? "bg-red-600 text-white shadow-sm" : "bg-zinc-800 text-zinc-400 hover:text-white")}
+                            >
+                              {num} SP
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
+                      {multiComments.map((commentTxt, idx) => (
+                        <div key={idx} className="p-2.5 rounded-lg bg-[#111117] border border-white/[0.08] space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-mono font-bold text-amber-400">
+                              💬 Bình luận #{idx + 1} (Sản phẩm Shopee độc lập #{idx + 1})
+                            </span>
+                            <span className="text-[10px] text-zinc-500 font-mono">1 Comment / 1 Link SP</span>
+                          </div>
+                          <Textarea
+                            rows={2}
+                            value={commentTxt}
+                            onChange={(e) => {
+                              const updated = [...multiComments];
+                              updated[idx] = e.target.value;
+                              setMultiComments(updated);
+                              form.setValue("firstCommentText", updated.join("\n---\n"));
+                            }}
+                            className="bg-zinc-950 border-white/[0.1] text-white font-mono text-xs"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
                       <input
                         type="checkbox"
                         id="pinComment"
@@ -2021,8 +2317,8 @@ function SchedulesContent() {
                         onChange={(e) => form.setValue('pinComment', e.target.checked)}
                         className="rounded border-zinc-700 bg-zinc-900 text-red-600 focus:ring-red-500 h-3.5 w-3.5"
                       />
-                      <label htmlFor="pinComment" className="text-xs text-zinc-300">
-                        Ghim bình luận này lên đầu (Pin to Top)
+                      <label htmlFor="pinComment" className="text-xs text-zinc-300 font-medium">
+                        Ghim các bình luận này lên đầu (Pin to Top)
                       </label>
                     </div>
                   </div>
@@ -2393,7 +2689,7 @@ function SchedulesContent() {
         <div className="space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
             <p className="text-xs text-zinc-300 font-medium">
-              Chọn một bài đăng, video hoặc hình ảnh từ Kho Album Post (/dashboard/albumpost) để lên lịch xuất bản:
+              Chọn một bài đăng, video hoặc hình ảnh từ Kho Album Media (/dashboard/album) để lên lịch xuất bản:
             </p>
             <Button
               size="sm"
@@ -2408,13 +2704,13 @@ function SchedulesContent() {
           {renderedVideos.length === 0 ? (
             <div className="p-12 text-center text-zinc-500 bg-[#18181f] rounded-xl border border-white/[0.08]">
               <Film className="w-10 h-10 mx-auto mb-2 text-zinc-600 opacity-60" />
-              <p className="text-sm font-semibold text-zinc-400">Kho Media & Album Post chưa có dữ liệu</p>
-              <p className="text-xs text-zinc-600 mt-1">Vui lòng tải lên ảnh/video hoặc cào bài từ TikTok/Fanpage vào Kho Album Post</p>
+              <p className="text-sm font-semibold text-zinc-400">Kho Media & Album chưa có dữ liệu</p>
+              <p className="text-xs text-zinc-600 mt-1">Vui lòng tải lên ảnh/video từ máy tính của bạn vào Kho Album</p>
               <a
-                href="/dashboard/albumpost"
+                href="/dashboard/album"
                 className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold text-xs rounded-lg transition-all"
               >
-                <Sparkles className="w-4 h-4" /> Đi đến Kho Media Album Post
+                <Sparkles className="w-4 h-4" /> Đi đến Kho Album Media (Up từ máy)
               </a>
             </div>
           ) : (

@@ -57,6 +57,30 @@ export async function POST(req: NextRequest) {
       console.warn('Redirect error in resolve-shopee:', e);
     }
 
+        // Extract real Shopee CDN image URL directly from Shopee HTML
+    let realShopeeImage = '';
+    try {
+      const shopeeHtmlRes = await fetch(finalUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+        },
+      });
+      const htmlText = await shopeeHtmlRes.text();
+      const matches = htmlText.match(/https?:\/\/(down-[a-z]+\.img\.susercontent\.com|cf\.shopee\.vn)\/file\/[a-zA-Z0-9_-]+/g);
+      if (matches && matches.length > 0) {
+        const productImgs = matches.filter(m => !m.includes('logo') && !m.includes('avatar') && !m.includes('icon'));
+        if (productImgs.length > 0) {
+          realShopeeImage = productImgs[0];
+        }
+      }
+    } catch (e) {
+      console.warn('Real image extraction error:', e);
+    }
+
     // 2. Try DuckDuckGo search fallback for indexed title if slug is opaque
     let searchTitle = urlTitle;
     if (!searchTitle) {
@@ -105,7 +129,7 @@ export async function POST(req: NextRequest) {
       keySellingPoints: ['Chất lượng cao, vải bền đẹp', 'Giá ưu đãi kèm voucher Shopee', 'Giao hàng nhanh'],
       suggestedVoiceoverHook: 'Đừng bỏ lỡ deal hời này hôm nay nhé!',
       suggestedComment: `🛒 Link đặt mua chính hãng săn voucher tại đây: ${rawUrl}`,
-      imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&q=80',
+      imageUrl: realShopeeImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&q=80',
       shopName: shopName || 'Shopee Store',
       shopId,
       itemId,

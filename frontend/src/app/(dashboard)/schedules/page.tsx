@@ -56,7 +56,7 @@ export default function SchedulesPage() {
   const handleSubmit = async (data: ScheduleForm) => {
     try {
       if (editingSchedule) {
-        await schedulesApi.update(editingSchedule.id, data.scheduledAt);
+        await schedulesApi.update(editingSchedule.id, { scheduledAt: data.scheduledAt } as any);
       } else {
         await schedulesApi.create(data);
       }

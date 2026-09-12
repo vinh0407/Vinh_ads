@@ -2,8 +2,6 @@
 
 import { forwardRef, HTMLAttributes, useState, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { ImageOff } from 'lucide-react';
-
 import Image from 'next/image';
 
 interface ThumbnailProps extends HTMLAttributes<HTMLDivElement> {
@@ -12,6 +10,16 @@ interface ThumbnailProps extends HTMLAttributes<HTMLDivElement> {
   fallbackIcon?: ReactNode;
   aspect?: 'square' | 'video';
   size?: 'sm' | 'md' | 'lg';
+}
+
+function getFallbackImage(altText = ''): string {
+  const n = altText.toLowerCase();
+  if (n.includes('quạt')) return 'https://images.unsplash.com/photo-1618941716939-553df3c6c276?w=600&q=80';
+  if (n.includes('giá đỡ') || n.includes('kẹp') || n.includes('motowolf') || n.includes('lamicall')) return 'https://images.unsplash.com/photo-1586105251261-72a756497a11?w=600&q=80';
+  if (n.includes('giấy') || n.includes('khăn') || n.includes('topgia') || n.includes('pio')) return 'https://images.unsplash.com/photo-1584556812952-905ffd0c611a?w=600&q=80';
+  if (n.includes('sữa tắm') || n.includes('dove') || n.includes('serum') || n.includes('torriden')) return 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&q=80';
+  if (n.includes('sốt') || n.includes('phô mai') || n.includes('tanzy')) return 'https://images.unsplash.com/photo-1585238342024-78d387f4a707?w=600&q=80';
+  return 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80';
 }
 
 export const Thumbnail = forwardRef<HTMLDivElement, ThumbnailProps>(
@@ -24,6 +32,8 @@ export const Thumbnail = forwardRef<HTMLDivElement, ThumbnailProps>(
       lg: aspect === 'square' ? 'h-20 w-20' : 'h-20 w-32',
     };
 
+    const effectiveSrc = (src && !imageError) ? src : getFallbackImage(alt);
+
     return (
       <div
         ref={ref}
@@ -34,22 +44,17 @@ export const Thumbnail = forwardRef<HTMLDivElement, ThumbnailProps>(
         )}
         {...props}
       >
-        {src && !imageError ? (
-          <Image
-            fill
-            unoptimized
-            src={src}
-            alt={alt || 'Thumbnail'}
-            className="object-cover"
-            onError={() => setImageError(true)}
-          />
-        ) : (
-          fallbackIcon || <ImageOff className="h-5 w-5 opacity-60" />
-        )}
+        <Image
+          fill
+          unoptimized
+          src={effectiveSrc}
+          alt={alt || 'Thumbnail'}
+          className="object-cover"
+          onError={() => setImageError(true)}
+        />
       </div>
     );
   }
 );
 
 Thumbnail.displayName = 'Thumbnail';
-

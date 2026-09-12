@@ -23,9 +23,9 @@ const navigationGroups = [
       { name: 'Studio Video AI', href: '/dashboard/videos/create', icon: Sparkles },
       { name: 'Kho Link Aff Shopee', href: '/dashboard/products', icon: Package },
       { name: 'Radar Tin & Viral', href: '/dashboard/news', icon: Radio },
-      { name: 'Len Lich Da Kenh', href: '/dashboard/schedules', icon: Calendar },
+      { name: 'Đăng Ngay', href: '/dashboard/upload', icon: Send },
       { name: 'AI Missions (1-Click)', href: '/dashboard/missions', icon: Bot },
-      { name: 'Kho Media Album Post', href: '/dashboard/albumpost', icon: Video },
+      { name: 'Kho Album (Up từ máy)', href: '/dashboard/album', icon: Video },
     ],
   },
   {

@@ -107,7 +107,7 @@ export default function ProductsPage() {
   const handleSaveAffiliate = async () => {
     if (!showAffiliateModal) return;
     try {
-      await productsApi.addAffiliateLink(showAffiliateModal.id, { network: affiliateNetwork, originalUrl: affiliateOriginalUrl, affiliateUrl });
+      await productsApi.addAffiliateLink(showAffiliateModal.id, { network: affiliateNetwork as any, originalUrl: affiliateOriginalUrl, affiliateUrl });
       setShowAffiliateModal(null);
       setAffiliateOriginalUrl('');
       setAffiliateUrl('');

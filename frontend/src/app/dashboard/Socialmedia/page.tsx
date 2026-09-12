@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -50,6 +50,18 @@ const DEFAULT_ACCOUNTS: SocialAccount[] = [
     isActive: true,
     createdAt: new Date().toISOString(),
   },
+  {
+    id: 'soc_th_28534125842893667',
+    name: '@vincekanjiro (Meta Threads)',
+    platform: 'THREADS',
+    channelId: '28534125842893667',
+    url: 'https://www.threads.net/@vincekanjiro',
+    avatarUrl: 'https://instagram.fsgn5-10.fna.fbcdn.net/v/t51.89012-19/573323465_1219825463302212_7278921664109726296_n.jpg?stp=dst-jpg_s206x206_tt6&_nc_cat=1&ig_cache_key=YW5vbnltb3VzX3Byb2ZpbGVfcGlj.3-ccb7-5&ccb=7-5&_nc_sid=30ff31&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGlj.3-ccb7-5',
+    category: 'Meta Threads Account',
+    token: 'THAAT5ZAruEzOZABYll2a2JoVnoweDdWamZAPckgwcVpwMTJUY2hrZA0JlaEFVTVhBQVJ2dEdkYkQ4WkJJYUk0UnN2b3FwOHY0cXlqN0dJdm8teTBGaUhxTjhCUEN4V3pHVm1Rb0RidnJBOUpjemlUdWZA5WXpRNlhVTFdkUVhQMnhlVkRyT0NtamxZARGdaaS1HVVEZD',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  },
 ];
 
 export default function SocialMediaPage() {
@@ -71,8 +83,16 @@ export default function SocialMediaPage() {
       if (typeof window !== 'undefined') {
         const stored = localStorage.getItem('custom_social_accounts');
         if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          let parsed: SocialAccount[] = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            // Clean up any legacy or unwanted Threads accounts and ensure @vincekanjiro is the only Threads account
+            parsed = parsed.filter(a => a.platform !== 'THREADS' || a.channelId === '28534125842893667' || a.name.includes('vincekanjiro'));
+            const hasVince = parsed.some(a => a.channelId === '28534125842893667' || a.name.includes('vincekanjiro'));
+            if (!hasVince) {
+              const vinceAccount = DEFAULT_ACCOUNTS.find(a => a.platform === 'THREADS');
+              if (vinceAccount) parsed.push(vinceAccount);
+            }
+            localStorage.setItem('custom_social_accounts', JSON.stringify(parsed));
             setAccounts(parsed);
             setLoading(false);
             return;
@@ -167,6 +187,15 @@ export default function SocialMediaPage() {
 
     const updated = [newAccount, ...accounts];
     saveAccounts(updated);
+
+    if (platform === 'THREADS' && token.trim()) {
+      localStorage.setItem('threads_api_config', JSON.stringify({
+        accessToken: token.trim(),
+        userId: cleanId || 'me',
+        updatedAt: new Date().toISOString(),
+      }));
+    }
+
     toast.success(`🎉 Đã thêm thành công kênh ${platform}: "${newAccount.name}"!`);
 
     // Reset & close

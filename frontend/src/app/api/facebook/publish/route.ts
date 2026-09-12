@@ -34,38 +34,61 @@ export async function POST(req: Request) {
 
     let externalPostId: string | null = null;
 
-    // 1. Main Feed Post (Always text status or main video/photo media, NEVER product image)
-    const feedFormData = new URLSearchParams();
-    feedFormData.append('message', caption.trim());
-    feedFormData.append('access_token', tokenToUse);
+    const mainPhotoUrl = body.postImageUrl || body.mediaUrl;
+    const isMainPhoto = mainPhotoUrl && (mainPhotoUrl.startsWith('http://') || mainPhotoUrl.startsWith('https://'));
 
-    const feedRes = await fetch(`https://graph.facebook.com/${targetPageId}/feed`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: feedFormData,
-    });
+    if (isMainPhoto) {
+      // 1. Photo Post with News Article Illustration Image
+      const photoFormData = new URLSearchParams();
+      photoFormData.append('url', mainPhotoUrl.trim());
+      photoFormData.append('caption', caption.trim());
+      photoFormData.append('access_token', tokenToUse);
 
-    const feedJson = await feedRes.json();
-
-    if (!feedRes.ok || feedJson.error) {
-      const fbError = feedJson.error || {};
-      let friendlyMsg = fbError.message || `Lỗi Facebook Graph API (Code ${fbError.code || feedRes.status})`;
-
-      if (fbError.code === 190) {
-        friendlyMsg = '🔑 Token Facebook Fanpage đã hết hạn. Vui lòng cập nhật Token mới tại trang Quản Lý Mạng Xã Hội.';
-      } else if (fbError.code === 200 || fbError.code === 283) {
-        friendlyMsg = '⚠️ Tài khoản Fanpage thiếu quyền "pages_manage_posts". Vui lòng kiểm tra quyền trên Meta Developer Portal.';
-      } else if (fbError.code === 100) {
-        friendlyMsg = `⚠️ Nội dung hoặc liên kết không hợp lệ: ${fbError.message}`;
+      const photoRes = await fetch(`https://graph.facebook.com/${targetPageId}/photos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: photoFormData,
+      });
+      const photoJson = await photoRes.json();
+      if (photoRes.ok && (photoJson.id || photoJson.post_id)) {
+        externalPostId = photoJson.post_id || photoJson.id;
       }
-
-      return NextResponse.json(
-        { success: false, error: friendlyMsg, rawError: fbError },
-        { status: 400 }
-      );
     }
 
-    externalPostId = feedJson.id;
+    if (!externalPostId) {
+      // Fallback: Text Feed Post
+      const feedFormData = new URLSearchParams();
+      feedFormData.append('message', caption.trim());
+      feedFormData.append('access_token', tokenToUse);
+
+      const feedRes = await fetch(`https://graph.facebook.com/${targetPageId}/feed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: feedFormData,
+      });
+
+      const feedJson = await feedRes.json();
+
+      if (!feedRes.ok || feedJson.error) {
+        const fbError = feedJson.error || {};
+        let friendlyMsg = fbError.message || `Lỗi Facebook Graph API (Code ${fbError.code || feedRes.status})`;
+
+        if (fbError.code === 190) {
+          friendlyMsg = '🔑 Token Facebook Fanpage đã hết hạn. Vui lòng cập nhật Token mới tại trang Quản Lý Mạng Xã Hội.';
+        } else if (fbError.code === 200 || fbError.code === 283) {
+          friendlyMsg = '⚠️ Tài khoản Fanpage thiếu quyền "pages_manage_posts". Vui lòng kiểm tra quyền trên Meta Developer Portal.';
+        } else if (fbError.code === 100) {
+          friendlyMsg = `⚠️ Nội dung hoặc liên kết không hợp lệ: ${fbError.message}`;
+        }
+
+        return NextResponse.json(
+          { success: false, error: friendlyMsg, rawError: fbError },
+          { status: 400 }
+        );
+      }
+
+      externalPostId = feedJson.id;
+    }
 
     let commentId: string | null = null;
     let commentNotice: string | null = null;
@@ -102,7 +125,7 @@ export async function POST(req: Request) {
           }
         }
 
-        const commentBlocks = firstCommentText.trim().split(/\n\n+/).filter((c: string) => c.trim());
+        const commentBlocks = firstCommentText.trim().split(/(?:\s*---\s*|\n\n+)/).filter((c: string) => c.trim());
         const publishedCommentIds: string[] = [];
 
         for (let idx = 0; idx < commentBlocks.length; idx++) {
@@ -147,15 +170,17 @@ export async function POST(req: Request) {
               publishedCommentIds.push(fallbackJson.id);
             }
           }
+          // Delay 400ms between multi-comments to prevent Facebook API rate limiting
+          if (idx < commentBlocks.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 400));
+          }
         }
 
         if (publishedCommentIds.length > 0) {
           commentId = publishedCommentIds[0];
-          if (publishedCommentIds.length > 1) {
-            commentNotice = `🎉 Đã tự động xuất bản ${publishedCommentIds.length} bình luận kèm link Shopee riêng biệt cho từng sản phẩm!`;
-          }
+          commentNotice = `🎉 Đã tự động xuất bản ${publishedCommentIds.length} bình luận kèm link Shopee!`;
         } else {
-          commentNotice = 'Link sản phẩm đã được tự động gắn vào nội dung bài đăng!';
+          commentNotice = '⚠️ Đã xuất bản bài viết nhưng không đăng được bình luận (kiểm tra token hoặc quyền trang).';
         }
       } catch (cErr: any) {
         commentNotice = 'Link sản phẩm đã được tự động gắn vào nội dung bài đăng!';
