@@ -1,7 +1,7 @@
 {
-  "name": "auto-content-hub-backend",
+  "name": "vinhads-backend",
   "version": "1.0.0",
-  "description": "Backend for Facebook Video Automation with Shopee Affiliate",
+  "description": "VinhAds Backend - AI Video SaaS with Shopee Affiliate",
   "private": true,
   "scripts": {
     "build": "nest build",

@@ -1,4 +1,4 @@
-﻿# 🚀 ACCONTENT HUBAI VIDEO SAAS v2.5 — HƯỚNG DẪN KHỞI ĐỘNG HỆ THỐNG
+﻿# 🚀 VinhAds VIDEO SAAS v2.5 — HƯỚNG DẪN KHỞI ĐỘNG HỆ THỐNG
 
 Hệ thống tự động hóa tạo video AI, quản lý sản phẩm Shopee Affiliate và xuất bản đa kênh Facebook, TikTok, Shorts & Threads.
 
@@ -9,10 +9,10 @@ Hệ thống tự động hóa tạo video AI, quản lý sản phẩm Shopee Af
 Toàn bộ script khởi động rải rác cũ đã được dọn dẹp và gom lại thành **1 NÚT DUY NHẤT** tại thư mục `StartAll`:
 
 👉 **Vị trí file Master:** `C:\VisualStudio\Modern SaaS Dashboard Design\StartAll\StartAll.bat`  
-👉 **Lối tắt ngoài Desktop:** `Desktop -> StartAll - ACCONTENT HUBAI.lnk`
+👉 **Lối tắt ngoài Desktop:** `Desktop -> StartAll - VinhAds.lnk`
 
 ### Cách khởi chạy:
-- **Cách 1:** Double-click vào file shortcut **`StartAll - ACCONTENT HUBAI.lnk`** trên màn hình Desktop.
+- **Cách 1:** Double-click vào file shortcut **`StartAll - VinhAds.lnk`** trên màn hình Desktop.
 - **Cách 2:** Mở thư mục `C:\VisualStudio\Modern SaaS Dashboard Design\StartAll` và double-click **`StartAll.bat`** (hoặc `StartAll.ps1`).
 
 ---

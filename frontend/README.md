@@ -1,6 +1,6 @@
-# Auto Content Hub - Frontend
+# VinhAds - Frontend
 
-Frontend dashboard for Facebook Video Automation with Shopee Affiliate.
+Frontend dashboard for AI Video SaaS with Shopee Affiliate.
 
 ## Tech Stack
 
@@ -142,6 +142,6 @@ npm start
 ## Docker
 
 ```bash
-docker build -t auto-content-hub-frontend .
-docker run -p 3001:3001 auto-content-hub-frontend
+docker build -t vinhads-frontend .
+docker run -p 3001:3001 vinhads-frontend
 ```

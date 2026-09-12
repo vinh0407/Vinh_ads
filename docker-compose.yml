@@ -3,11 +3,11 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: auto-content-hub-postgres
+    container_name: vinhads-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: auto_content_hub
+      POSTGRES_DB: vinhads
     ports:
       - "5432:5432"
     volumes:
@@ -20,7 +20,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: auto-content-hub-redis
+    container_name: vinhads-redis
     ports:
       - "6379:6379"
     volumes:
@@ -35,9 +35,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: auto-content-hub-backend
+    container_name: vinhads-backend
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/auto_content_hub?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/vinhads?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET}
@@ -65,9 +65,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.worker
-    container_name: auto-content-hub-worker
+    container_name: vinhads-worker
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/auto_content_hub?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/vinhads?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET}
@@ -91,7 +91,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: auto-content-hub-frontend
+    container_name: vinhads-frontend
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
       PORT: 3001

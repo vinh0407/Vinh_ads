@@ -1,4 +1,4 @@
-﻿# Master Silent Launcher — ACCONTENT HUBAI SAAS v2.5 (App Mode)
+﻿# Master Silent Launcher — VinhAds SAAS v2.5 (App Mode)
 $projectRoot = 'C:\VisualStudio\Modern SaaS Dashboard Design'
 $backendPath = Join-Path $projectRoot 'backend'
 $frontendPath = Join-Path $projectRoot 'frontend'

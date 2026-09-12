@@ -1,4 +1,4 @@
-# ACCONTENT HUBAI - Video SaaS Automation Platform
+# VinhAds - Video SaaS Automation Platform
 
 > **Hệ thống tự động hóa tạo video AI, quản lý sản phẩm Shopee Affiliate và xuất bản đa kênh Facebook, TikTok, Shorts & Threads.**
 
@@ -14,7 +14,7 @@
 
 ## 📖 Tổng quan
 
-**ACCONTENT HUBAI** là nền tảng SaaS tự động hóa quy trình content marketing video hoàn chỉnh:
+**VinhAds** là nền tảng SaaS tự động hóa quy trình content marketing video hoàn chỉnh:
 
 1. **🔄 Ingestion** - Tự động sync video từ Facebook Pages, YouTube, TikTok
 2. **🤖 AI Content Factory** - Gemini AI tạo script TikTok, video quảng cáo, bài viết social, match sản phẩm Shopee
@@ -77,7 +77,7 @@
 
 ```bash
 # Double-click file shortcut trên Desktop:
-# Desktop → "StartAll - ACCONTENT HUBAI.lnk"
+# Desktop → "StartAll - VinhAds.lnk"
 
 # Hoặc chạy trực tiếp:
 cd StartAll
@@ -109,7 +109,7 @@ cd backend
 npm run start:worker
 
 # 4. Frontend (terminal riêng)
-cd vince-ai/apps/web  # hoặc apps/web ở root
+cd apps/web  # hoặc vince-ai/apps/web ở root
 npm install
 npm run dev
 ```
@@ -163,7 +163,7 @@ FACEBOOK_CALLBACK_URL=http://localhost:3000/api/facebook/callback
 
 # Storage (S3-compatible: MinIO, AWS S3, Cloudflare R2)
 STORAGE_ENDPOINT=http://localhost:9000
-STORAGE_BUCKET=vince-ai
+STORAGE_BUCKET=vinhads
 STORAGE_ACCESS_KEY=minioadmin
 STORAGE_SECRET_KEY=minioadmin
 STORAGE_REGION=auto
@@ -174,7 +174,7 @@ NEMOTRON_API_KEY=your-nemotron-api-key
 OPENCODE_API_KEY=your-opencode-api-key
 ```
 
-### Frontend (`vince-ai/apps/web/.env.local` hoặc `apps/web/.env.local`)
+### Frontend (`apps/web/.env.local` hoặc `vince-ai/apps/web/.env.local`)
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3000/api
@@ -247,7 +247,7 @@ npm run prisma:migrate      # Migration
 npm run test                # Jest tests
 npm run lint                # ESLint
 
-# Frontend (vince-ai/apps/web hoặc apps/web)
+# Frontend (apps/web hoặc vince-ai/apps/web)
 npm run dev                 # Next.js dev (port 3001)
 npm run build               # Production build
 npm run lint                # Next.js lint
@@ -334,7 +334,7 @@ C:\VisualStudio\Modern SaaS Dashboard Design\
 │   ├── prisma/migrations/          # DB migrations
 │   └── Dockerfile / Dockerfile.worker
 │
-├── vince-ai/                     # TurboRepo monorepo (SHARED PACKAGES)
+├── vince-ai/                     # TurboRepo monorepo (SHARED PACKAGES - internal @vince-ai/* scopes)
 │   ├── apps/web/                 # Next.js Dashboard (duplicate)
 │   ├── packages/
 │   │   ├── shared/               # Types, crypto, logger, events

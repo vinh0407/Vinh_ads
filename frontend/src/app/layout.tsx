@@ -5,8 +5,8 @@ import './globals.css';
 import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
-  title: 'ACCONTENT HUBAI — AI Video SaaS v2.4',
-  description: 'He thong tu dong tao video AI, quan ly san pham Shopee Affiliate va dang da kenh',
+  title: 'VinhAds — AI Video SaaS',
+  description: 'Hệ thống tự động tạo video AI, quản lý sản phẩm Shopee Affiliate và đăng đa kênh',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
