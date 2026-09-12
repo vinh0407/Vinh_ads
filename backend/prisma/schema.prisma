@@ -1,0 +1,526 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum VideoStatus {
+  DISCOVERED
+  IMPORTING
+  PROCESSING
+  READY
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  ARCHIVED
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  QUEUED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum SourceStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+}
+
+enum Platform {
+  FACEBOOK
+  YOUTUBE
+  TIKTOK
+  INSTAGRAM
+}
+
+enum AffiliateNetwork {
+  SHOPEE
+  LAZADA
+  TIKTOK
+  TIKI
+  SENDO
+}
+
+enum VideoProcessingJobType {
+  DOWNLOAD
+  THUMBNAIL
+  TRANSCODE
+  VALIDATE
+  HASH
+}
+
+enum NotificationType {
+  VIDEO_IMPORTED
+  POST_PUBLISHED
+  POST_FAILED
+  SOURCE_SYNC_FAILED
+  TOKEN_EXPIRING
+}
+
+enum ActivityAction {
+  USER_CREATED
+  USER_LOGIN
+  SOURCE_CREATED
+  SOURCE_UPDATED
+  SOURCE_DELETED
+  SOURCE_SYNC_STARTED
+  SOURCE_SYNC_COMPLETED
+  SOURCE_SYNC_FAILED
+  VIDEO_DISCOVERED
+  VIDEO_IMPORTED
+  VIDEO_PROCESSING_STARTED
+  VIDEO_PROCESSING_COMPLETED
+  VIDEO_PROCESSING_FAILED
+  VIDEO_ARCHIVED
+  PRODUCT_CREATED
+  PRODUCT_UPDATED
+  PRODUCT_DELETED
+  TEMPLATE_CREATED
+  TEMPLATE_UPDATED
+  TEMPLATE_DELETED
+  POST_CREATED
+  POST_UPDATED
+  POST_SCHEDULED
+  POST_PUBLISHED
+  POST_FAILED
+  POST_CANCELLED
+  FACEBOOK_PAGE_CONNECTED
+  FACEBOOK_PAGE_DISCONNECTED
+  FACEBOOK_TOKEN_REFRESHED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String
+  avatarUrl     String?   @map("avatar_url")
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  refreshTokens     RefreshToken[]
+  sourcePages       SourcePage[]
+  videos            Video[]
+  products          Product[]
+  captionTemplates  CaptionTemplate[]
+  commentTemplates  CommentTemplate[]
+  posts             Post[]
+    facebookPages     FacebookPage[]
+    facebookOAuthSessions FacebookOAuthSession[]
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
+  settings          UserSettings?
+
+  @@map("users")
+}
+
+model FacebookOAuthSession {
+  id                    String    @id @default(uuid())
+  userId                String    @map("user_id")
+  stateHash             String    @unique @map("state_hash")
+  pendingPagesEncrypted String?   @map("pending_pages_encrypted")
+  tokenExpiresAt        DateTime? @map("token_expires_at")
+  expiresAt             DateTime  @map("expires_at")
+  usedAt                DateTime? @map("used_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, expiresAt])
+  @@map("facebook_oauth_sessions")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model SourcePage {
+  id              String       @id @default(uuid())
+  userId          String       @map("user_id")
+  platform        Platform
+  platformPageId  String       @map("platform_page_id")
+  pageName        String       @map("page_name")
+  pageUrl         String       @map("page_url")
+  avatarUrl       String?      @map("avatar_url")
+  syncEnabled     Boolean      @default(true) @map("sync_enabled")
+  syncInterval    Int          @default(1800) @map("sync_interval")
+  lastSyncedAt    DateTime?    @map("last_synced_at")
+  status          SourceStatus @default(ACTIVE)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceVideos SourceVideo[]
+  syncRuns     SyncRun[]
+
+  @@unique([userId, platformPageId])
+  @@map("source_pages")
+}
+
+model SourceVideo {
+  id                String       @id @default(uuid())
+  sourcePageId      String       @map("source_page_id")
+  externalVideoId   String       @map("external_video_id")
+  sourceUrl         String       @map("source_url")
+  title             String
+  description       String?
+  publishedAt       DateTime     @map("published_at")
+  duration          Int?
+  width             Int?
+  height            Int?
+  thumbnailUrl      String?      @map("thumbnail_url")
+  status            SourceStatus @default(ACTIVE)
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  sourcePage SourcePage @relation(fields: [sourcePageId], references: [id], onDelete: Cascade)
+  video      Video?
+
+  @@unique([sourcePageId, externalVideoId])
+  @@map("source_videos")
+}
+
+model SyncRun {
+  id            String   @id @default(uuid())
+  sourcePageId  String   @map("source_page_id")
+  startedAt     DateTime @default(now()) @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  status        JobStatus @default(PENDING)
+  videosFound   Int      @default(0) @map("videos_found")
+  videosNew     Int      @default(0) @map("videos_new")
+  videosSkipped Int      @default(0) @map("videos_skipped")
+  errorMessage  String?  @map("error_message")
+
+  sourcePage SourcePage @relation(fields: [sourcePageId], references: [id], onDelete: Cascade)
+
+  @@map("sync_runs")
+}
+
+model Video {
+  id               String       @id @default(uuid())
+  userId           String       @map("user_id")
+  sourceVideoId    String?      @unique @map("source_video_id")
+  title            String
+  description      String?
+  duration         Int?
+  width            Int?
+  height           Int?
+  thumbnailUrl     String?      @map("thumbnail_url")
+  storageKey       String?      @map("storage_key")
+  fileSize         BigInt?      @map("file_size")
+  mimeType         String?      @map("mime_type")
+  hashSha256       String?      @unique @map("hash_sha256")
+  perceptualHash   String?      @map("perceptual_hash")
+  status           VideoStatus  @default(DISCOVERED)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceVideo      SourceVideo?            @relation(fields: [sourceVideoId], references: [id], onDelete: SetNull)
+  videoFiles       VideoFile[]
+  processingJobs   VideoProcessingJob[]
+  posts            Post[]
+
+  @@map("videos")
+}
+
+model VideoFile {
+  id          String   @id @default(uuid())
+  videoId     String   @map("video_id")
+  fileType    String   @map("file_type")
+  storageKey  String   @map("storage_key")
+  fileSize    BigInt   @map("file_size")
+  mimeType    String   @map("mime_type")
+  width       Int?
+  height      Int?
+  duration    Int?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@map("video_files")
+}
+
+model VideoProcessingJob {
+  id           String                   @id @default(uuid())
+  videoId      String                   @map("video_id")
+  jobType      VideoProcessingJobType   @map("job_type")
+  status       JobStatus                @default(PENDING)
+  inputKey     String?                  @map("input_key")
+  outputKey    String?                  @map("output_key")
+  errorMessage String?                  @map("error_message")
+  startedAt    DateTime?                @map("started_at")
+  completedAt  DateTime?                @map("completed_at")
+  createdAt    DateTime                 @default(now()) @map("created_at")
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@map("video_processing_jobs")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  shopeeUrl   String   @map("shopee_url")
+  imageUrl    String?  @map("image_url")
+  price       Decimal  @db.Decimal(12, 2)
+  currency    String   @default("VND")
+  category    String?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  affiliateLinks   AffiliateLink[]
+  postProducts     PostProduct[]
+
+  @@map("products")
+}
+
+model AffiliateLink {
+  id              String           @id @default(uuid())
+  productId       String           @map("product_id")
+  network         AffiliateNetwork
+  originalUrl     String           @map("original_url")
+  affiliateUrl    String           @map("affiliate_url")
+  clickCount      Int              @default(0) @map("click_count")
+  conversionCount Int              @default(0) @map("conversion_count")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("affiliate_links")
+}
+
+model CaptionTemplate {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  content   String
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("caption_templates")
+}
+
+model CommentTemplate {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  content   String
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("comment_templates")
+}
+
+model Post {
+  id              String     @id @default(uuid())
+  userId          String     @map("user_id")
+  videoId         String     @map("video_id")
+  facebookPageId  String     @map("facebook_page_id")
+  caption         String
+  firstComment    String?    @map("first_comment")
+  status          PostStatus @default(DRAFT)
+  scheduledAt     DateTime?  @map("scheduled_at")
+  publishedAt     DateTime?  @map("published_at")
+  externalPostId  String?    @unique @map("external_post_id")
+  errorCode       String?    @map("error_code")
+  errorMessage    String?    @map("error_message")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video          Video            @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  facebookPage   FacebookPage     @relation(fields: [facebookPageId], references: [id], onDelete: Cascade)
+  postProducts   PostProduct[]
+  schedule       Schedule?
+  metrics        PostMetric[]
+
+  @@map("posts")
+}
+
+model PostProduct {
+  postId    String @map("post_id")
+  productId String @map("product_id")
+
+  post    Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([postId, productId])
+  @@map("post_products")
+}
+
+model FacebookPage {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  pageId      String   @map("page_id")
+  pageName    String   @map("page_name")
+  pageUrl     String   @map("page_url")
+  avatarUrl   String?  @map("avatar_url")
+  status      String   @default("ACTIVE")
+  connectedAt DateTime @default(now()) @map("connected_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token          FacebookPageToken?
+  posts          Post[]
+  pageMetrics    PageMetric[]
+
+  @@unique([userId, pageId])
+  @@map("facebook_pages")
+}
+
+model FacebookPageToken {
+  id                String   @id @default(uuid())
+  facebookPageId    String   @unique @map("facebook_page_id")
+  accessTokenEncrypted String  @map("access_token_encrypted")
+  expiresAt         DateTime @map("expires_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  facebookPage FacebookPage @relation(fields: [facebookPageId], references: [id], onDelete: Cascade)
+
+  @@map("facebook_page_tokens")
+}
+
+model Schedule {
+  id           String     @id @default(uuid())
+  postId       String     @unique @map("post_id")
+  scheduledAt  DateTime   @map("scheduled_at")
+  status       JobStatus  @default(PENDING)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("schedules")
+}
+
+model PostMetric {
+  id         String   @id @default(uuid())
+  postId     String   @map("post_id")
+  views      BigInt   @default(0)
+  likes      BigInt   @default(0)
+  comments   BigInt   @default(0)
+  shares     BigInt   @default(0)
+  affiliateClicks BigInt @default(0) @map("affiliate_clicks")
+  ctr        Float?   // Click-through rate
+  revenue    Decimal? @db.Decimal(12, 2)
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("post_metrics")
+}
+
+model AffiliateClick {
+  id            String   @id @default(uuid())
+  productId     String   @map("product_id")
+  postId        String?  @map("post_id")
+  affiliateLinkId String  @map("affiliate_link_id")
+  clickedAt     DateTime @default(now()) @map("clicked_at")
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  referrer      String?
+
+  @@map("affiliate_clicks")
+}
+
+model PageMetric {
+  id         String   @id @default(uuid())
+  facebookPageId String @map("facebook_page_id")
+  followers  BigInt   @default(0)
+  engagement BigInt   @default(0)
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  facebookPage FacebookPage @relation(fields: [facebookPageId], references: [id], onDelete: Cascade)
+
+  @@map("page_metrics")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  action     ActivityAction
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  status     JobStatus @default(PENDING)
+  message    String?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String
+  message   String
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model UserSettings {
+  id                        String   @id @default(uuid())
+  userId                    String   @unique @map("user_id")
+  autoSync                  Boolean  @default(true) @map("auto_sync")
+  defaultSyncInterval       Int      @default(1800) @map("default_sync_interval")
+  defaultCaptionTemplateId  String?  @map("default_caption_template_id")
+  defaultCommentTemplateId  String?  @map("default_comment_template_id")
+  notificationEnabled       Boolean  @default(true) @map("notification_enabled")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}

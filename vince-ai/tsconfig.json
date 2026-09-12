@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@vince-ai/*": ["packages/*/src"],
+      "@vince-ai/ai/*": ["packages/ai/*/src"],
+      "@vince-ai/browser/*": ["packages/browser/*/src"],
+      "@vince-ai/research/*": ["packages/research/*/src"],
+      "@vince-ai/content/*": ["packages/content/*/src"],
+      "@vince-ai/video/*": ["packages/video/*/src"],
+      "@vince-ai/social/*": ["packages/social/*/src"],
+      "@vince-ai/affiliate/*": ["packages/affiliate/*/src"],
+      "@vince-ai/auth/*": ["packages/auth/*/src"],
+      "@vince-ai/database": ["packages/database/src"],
+      "@vince-ai/security": ["packages/security/src"],
+      "@vince-ai/shared": ["packages/shared/src"],
+      "@vince-ai/agents/*": ["agents/*/src"],
+      "@vince-ai/web": ["apps/web/src"],
+      "@vince-ai/desktop": ["apps/desktop-agent/src"]
+    },
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [],
+  "exclude": ["node_modules", "dist", "build", ".turbo", ".next", ".vercel"]
+}

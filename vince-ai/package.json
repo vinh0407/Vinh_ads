@@ -1,0 +1,58 @@
+{
+  "name": "vince-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vince AI - Local-First AI Video Factory with Google/Gemini/OpenCode Integration",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "agents/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:backend\"",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "dev:desktop": "npm run dev --workspace=apps/desktop-agent",
+    "build": "turbo run build",
+    "build:web": "npm run build --workspace=apps/web",
+    "build:backend": "npm run build --workspace=apps/backend",
+    "build:all": "npm run build --workspaces",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch",
+    "test:e2e": "playwright test",
+    "db:generate": "npm run db:generate --workspace=packages/database",
+    "db:push": "npm run db:push --workspace=packages/database",
+    "db:studio": "npm run db:studio --workspace=packages/database",
+    "db:migrate": "npm run db:migrate --workspace=packages/database",
+    "db:seed": "npm run db:seed --workspace=packages/database",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "prepare": "husky install",
+    "postinstall": "npm run prepare",
+    "doctor": "node scripts/doctor.js",
+    "start": "npm run dev",
+    "start:prod": "npm run build && npm run start:backend & npm run start:web",
+    "security:audit": "npm audit --audit-level=high"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "concurrently": "^8.2.2",
+    "husky": "^9.0.11",
+    "prettier": "^3.2.5",
+    "turbo": "^1.13.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.3.0",
+    "@playwright/test": "^1.42.0",
+    "@types/jest": "^29.5.12"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "packageManager": "npm@10.5.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

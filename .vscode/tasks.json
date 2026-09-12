@@ -1,0 +1,134 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "🚀 Start Auto Content Hub (Full)",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "start"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "⚡ Start Auto Content Hub (Quick - Skip Install)",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "start:quick"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔧 Start Backend Only",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "backend:dev"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🎨 Start Frontend Only",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "frontend:dev"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🐘 Start Databases (PostgreSQL + Redis)",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "db:up"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🛑 Stop Databases",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "db:down"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📦 Install All Dependencies",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "install:all"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🗄️ Run Migrations",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "backend:migrate"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔍 Open Prisma Studio",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "backend:studio"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
